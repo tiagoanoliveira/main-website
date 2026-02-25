@@ -12,6 +12,9 @@ export default [
     layout("routes/admin.layout.tsx", [
         ...prefix("admin", [
             route("dashboard", "routes/admin.dashboard.tsx"),
+            route("tickets",         "routes/admin.tickets.tsx"),
+            route("tickets/:id",     "routes/admin.tickets.$id.tsx"),
+            route("clients",         "routes/admin.clients.tsx"),
         ]),
     ]),
 ] satisfies RouteConfig;
