@@ -2,6 +2,7 @@ import { data, redirect, useLoaderData, Form } from "react-router";
 import type { Route } from "./+types/admin.tickets.$id";
 import { getTicketById, getTicketMessages, createTicketMessage, updateTicketStatus } from "~/lib/db";
 import StatusBadge from "~/components/ui/StatusBadge";
+import { sendAdminReply } from "~/lib/email";
 
 export async function loader({ params, context }: Route.LoaderArgs) {
     const db     = context.cloudflare.env.DB;
@@ -16,6 +17,7 @@ export async function loader({ params, context }: Route.LoaderArgs) {
 
 export async function action({ request, params, context }: Route.ActionArgs) {
     const db     = context.cloudflare.env.DB;
+    const env    = context.cloudflare.env;
     const id     = Number(params.id);
     const form   = await request.formData();
     const intent = String(form.get("intent"));
@@ -23,15 +25,32 @@ export async function action({ request, params, context }: Route.ActionArgs) {
     if (intent === "reply") {
         const message = String(form.get("message") || "").trim();
         if (!message) return data({ error: "A resposta não pode estar vazia." }, { status: 400 });
+
         await createTicketMessage(db, { ticketId: id, sender: "admin", message });
         await updateTicketStatus(db, id, "in_progress");
-        // Fase 5: enviar email ao cliente aqui
+
+        // Buscar ticket para obter dados do cliente
+        const ticket = await getTicketById(db, id);
+        if (ticket && env.RESEND_API_KEY) {
+            await sendAdminReply({
+                apiKey:      env.RESEND_API_KEY,
+                from:        env.FROM_EMAIL,
+                replyTo:     `ticket-${id}@suporte.tiagoanoliveira.pt`,
+                to:          ticket.client_email,
+                clientName:  ticket.client_name,
+                ticketId:    id,
+                category:    ticket.category,
+                message,
+                publicToken: ticket.public_token,
+                baseUrl:     env.BASE_URL,
+            });
+        }
+
         return redirect(`/admin/tickets/${id}`);
     }
 
     if (intent === "status") {
-        const status = String(form.get("status"));
-        await updateTicketStatus(db, id, status);
+        await updateTicketStatus(db, id, String(form.get("status")));
         return redirect(`/admin/tickets/${id}`);
     }
 
