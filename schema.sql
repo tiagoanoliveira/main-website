@@ -47,3 +47,10 @@ CREATE TABLE IF NOT EXISTS invoices (
     paid_at DATETIME,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS sessions (
+    id TEXT PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id),
+    expires_at DATETIME NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
