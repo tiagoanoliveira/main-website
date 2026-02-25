@@ -29,21 +29,28 @@ export async function action({ request, params, context }: Route.ActionArgs) {
         await createTicketMessage(db, { ticketId: id, sender: "admin", message });
         await updateTicketStatus(db, id, "in_progress");
 
-        // Buscar ticket para obter dados do cliente
         const ticket = await getTicketById(db, id);
-        if (ticket && env.RESEND_API_KEY) {
-            await sendAdminReply({
-                apiKey:      env.RESEND_API_KEY,
-                from:        env.FROM_EMAIL,
-                replyTo:     `ticket-${id}@suporte.tiagoanoliveira.pt`,
-                to:          ticket.client_email,
-                clientName:  ticket.client_name,
-                ticketId:    id,
-                category:    ticket.category,
-                message,
-                publicToken: ticket.public_token,
-                baseUrl:     env.BASE_URL,
-            });
+
+        if (!env.RESEND_API_KEY) {
+            console.warn("⚠️  RESEND_API_KEY não configurado — email não enviado.");
+        } else if (ticket) {
+            try {
+                const result = await sendAdminReply({
+                    apiKey:      env.RESEND_API_KEY,
+                    from:        env.FROM_EMAIL,
+                    replyTo:     `ticket-${id}@suporte.tiagoanoliveira.pt`,
+                    to:          ticket.client_email,
+                    clientName:  ticket.client_name,
+                    ticketId:    id,
+                    category:    ticket.category,
+                    message,
+                    publicToken: ticket.public_token,
+                    baseUrl:     env.BASE_URL,
+                });
+                console.log("✅ Email enviado:", result);
+            } catch (err) {
+                console.error("❌ Erro ao enviar email:", err);
+            }
         }
 
         return redirect(`/admin/tickets/${id}`);
