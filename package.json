@@ -12,10 +12,13 @@
 		"typecheck": "npm run cf-typegen && react-router typegen && tsc -b"
 	},
 	"dependencies": {
+		"better-auth": "^1.4.19",
 		"isbot": "^5.1.31",
+		"postal-mime": "^2.7.3",
 		"react": "^19.1.1",
 		"react-dom": "^19.1.1",
-		"react-router": "^7.10.0"
+		"react-router": "^7.10.0",
+		"resend": "^6.9.2"
 	},
 	"devDependencies": {
 		"@cloudflare/vite-plugin": "^1.13.5",
