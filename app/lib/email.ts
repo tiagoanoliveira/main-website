@@ -50,10 +50,10 @@ export async function sendAdminReply(params: {
     const resend = new Resend(params.apiKey);
     const url = `${params.baseUrl}/ticket/${params.publicToken}`;
     return resend.emails.send({
-        from:     params.from,
-        to:       params.to,
+        from:    params.from,
+        to:      params.to,
         replyTo: params.from,
-        subject:  `[Suporte #${params.ticketId}] Nova resposta — ${params.category}`,
+        subject: `[Suporte #${params.ticketId}] Nova resposta — ${params.category}`,
         html: `
       <div style="${style}">
         <div style="background:#2563eb;padding:32px;border-radius:12px 12px 0 0;">
@@ -76,26 +76,39 @@ export async function sendAdminReply(params: {
     });
 }
 
-// ── Notificação ao admin quando cliente responde ──────────────
+// ── Notificação ao admin (resposta de cliente OU novo ticket) ──
 
 export async function sendAdminNotification(params: {
     apiKey: string; from: string; adminEmail: string;
     clientName: string; ticketId: number;
     message: string; baseUrl: string;
+    isNewTicket?: boolean;
+    category?: string;
 }) {
-    const resend = new Resend(params.apiKey);
-    const url = `${params.baseUrl}/admin/tickets/${params.ticketId}`;
+    const resend   = new Resend(params.apiKey);
+    const url      = `${params.baseUrl}/admin/tickets/${params.ticketId}`;
+    const isNew    = params.isNewTicket ?? false;
+    const subject  = isNew
+        ? `[Novo Ticket #${params.ticketId}] ${params.category ?? ""} — ${params.clientName}`
+        : `[Ticket #${params.ticketId}] Nova resposta de ${params.clientName}`;
+    const heading  = isNew
+        ? `Novo Ticket #${params.ticketId} Aberto`
+        : `Resposta no Ticket #${params.ticketId}`;
+    const intro    = isNew
+        ? `<strong>${params.clientName}</strong> abriu um novo pedido de suporte${params.category ? ` na categoria <strong>${params.category}</strong>` : ""}:`
+        : `<strong>${params.clientName}</strong> respondeu:`;
+
     return resend.emails.send({
         from:    params.from,
         to:      params.adminEmail,
-        subject: `[Ticket #${params.ticketId}] Nova resposta de ${params.clientName}`,
+        subject,
         html: `
       <div style="${style}">
         <div style="background:#111827;padding:24px;border-radius:12px 12px 0 0;">
-          <h1 style="color:white;margin:0;font-size:18px;">Resposta no Ticket #${params.ticketId}</h1>
+          <h1 style="color:white;margin:0;font-size:18px;">${heading}</h1>
         </div>
         <div style="background:#f9fafb;padding:24px;border-radius:0 0 12px 12px;border:1px solid #e5e7eb;border-top:none;">
-          <p style="margin:0 0 12px;color:#6b7280;"><strong>${params.clientName}</strong> respondeu:</p>
+          <p style="margin:0 0 12px;color:#6b7280;">${intro}</p>
           <div style="background:white;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:20px;">
             <p style="margin:0;line-height:1.7;">${params.message.replace(/\n/g, "<br>")}</p>
           </div>

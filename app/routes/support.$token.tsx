@@ -2,10 +2,10 @@
 import { data, redirect, useLoaderData, useActionData, Form, useNavigation } from "react-router";
 import type { Route } from "./+types/support.$token";
 import { getSiteByToken, createTicket, createAttachment } from "~/lib/db";
-import { sendTicketConfirmation } from "~/lib/email";
+import { sendTicketConfirmation, sendAdminNotification } from "~/lib/email";
 import { uploadFile, buildR2Key } from "~/lib/storage";
 import { motion } from "motion/react";
-import { CheckCircle, Loader2, Paperclip } from "lucide-react";
+import { Loader2, Paperclip } from "lucide-react";
 
 const CATEGORIES = [
     "Problema com reserva",
@@ -47,6 +47,7 @@ export async function action({ params, request, context }: Route.ActionArgs) {
         siteId: site.id, clientName, clientEmail, category, description,
     });
 
+    // Upload de anexos do ticket inicial
     const files = form.getAll("files") as File[];
     for (const file of files) {
         if (!(file instanceof File) || file.size === 0) continue;
@@ -66,6 +67,7 @@ export async function action({ params, request, context }: Route.ActionArgs) {
         }
     }
 
+    // Email de confirmação ao cliente
     if (env.RESEND_API_KEY) {
         await sendTicketConfirmation({
             apiKey:      env.RESEND_API_KEY,
@@ -77,6 +79,19 @@ export async function action({ params, request, context }: Route.ActionArgs) {
             description,
             publicToken,
             baseUrl:     env.BASE_URL,
+        }).catch(console.error);
+    }
+
+    // Email de notificação ao admin sobre novo ticket
+    if (env.RESEND_API_KEY && env.ADMIN_EMAIL) {
+        await sendAdminNotification({
+            apiKey:     env.RESEND_API_KEY,
+            from:       env.FROM_EMAIL,
+            adminEmail: env.ADMIN_EMAIL,
+            clientName,
+            ticketId:   id,
+            message:    description,
+            baseUrl:    env.BASE_URL,
         }).catch(console.error);
     }
 
@@ -100,8 +115,19 @@ export default function SupportForm() {
             >
                 {/* Header */}
                 <div className="text-center mb-8">
-                    <div className="inline-flex items-center justify-center w-12 h-12 bg-blue-600 rounded-xl mb-4">
-                        <span className="text-white text-xl">💬</span>
+                    <div
+                        className="inline-flex items-center justify-center w-12 h-12 rounded-xl mb-4"
+                        style={{ backgroundColor: site.brand_color ?? "#2563eb" }}
+                    >
+                        {site.logo_r2_key ? (
+                            <img
+                                src={`/uploads/${site.logo_r2_key}`}
+                                alt={site.name}
+                                className="h-8 w-8 object-contain rounded-lg"
+                            />
+                        ) : (
+                            <span className="text-white text-xl">💬</span>
+                        )}
                     </div>
                     <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
                         Suporte — {site.name}
@@ -199,6 +225,7 @@ export default function SupportForm() {
                             )}
                         </div>
 
+                        {/* Anexos */}
                         <div>
                             <label className="flex items-center gap-1.5 text-sm font-medium mb-1.5">
                                 <Paperclip size={14} />
@@ -226,7 +253,8 @@ export default function SupportForm() {
                         <button
                             type="submit"
                             disabled={isLoading}
-                            className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
+                            style={{ backgroundColor: isLoading ? undefined : (site.brand_color ?? "#2563eb") }}
+                            className="w-full py-3 disabled:opacity-60 text-white font-medium rounded-xl transition-opacity flex items-center justify-center gap-2"
                         >
                             {isLoading ? (
                                 <>

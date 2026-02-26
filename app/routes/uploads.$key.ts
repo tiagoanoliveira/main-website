@@ -18,12 +18,12 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
     const obj = await env.UPLOADS.get(key);
     if (!obj) throw data("Ficheiro não encontrado", { status: 404 });
 
-    const fileName = key.split("/").pop() ?? "ficheiro";
+    const fileName    = key.split("/").pop() ?? "ficheiro";
     const contentType = obj.httpMetadata?.contentType ?? "application/octet-stream";
 
     const headers = new Headers();
     headers.set("Content-Type", contentType);
-    // inline = browser tenta mostrar (imagens/PDFs); attachment = força download
+    // inline = browser mostra imagem/PDF directamente em vez de forçar download
     headers.set("Content-Disposition", `inline; filename="${fileName}"`);
     headers.set("Cache-Control", "private, max-age=3600");
 
