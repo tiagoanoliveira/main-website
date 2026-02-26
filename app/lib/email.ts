@@ -52,7 +52,7 @@ export async function sendAdminReply(params: {
     return resend.emails.send({
         from:     params.from,
         to:       params.to,
-        reply_to: params.from,
+        replyTo: params.from,
         subject:  `[Suporte #${params.ticketId}] Nova resposta — ${params.category}`,
         html: `
       <div style="${style}">

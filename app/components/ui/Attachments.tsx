@@ -1,9 +1,9 @@
 // app/components/ui/Attachments.tsx
-import { Paperclip, FileText, Image, Trash2, Download } from "lucide-react";
+import { Paperclip, FileText, Image as ImageIcon, Trash2, Download } from "lucide-react";
 import type { Attachment } from "~/lib/db";
 
 function FileIcon({ type }: { type: string }) {
-    if (type.startsWith("image/")) return <Image size={14} className="text-blue-500" />;
+    if (type.startsWith("image/")) return <ImageIcon size={14} className="text-blue-500" />;
     return <FileText size={14} className="text-red-500" />;
 }
 

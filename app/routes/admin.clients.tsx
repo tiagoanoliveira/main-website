@@ -1,3 +1,4 @@
+// app/routes/admin.clients.tsx
 import { data, redirect, useActionData, useLoaderData, Form } from "react-router";
 import type { Route } from "./+types/admin.clients";
 import { useState } from "react";
@@ -33,7 +34,6 @@ export async function action({ request, context }: Route.ActionArgs) {
     const form   = await request.formData();
     const intent = String(form.get("intent") || "");
 
-    // ── Criar cliente + site ──────────────────────────────────────
     if (intent === "create") {
         const siteName    = String(form.get("siteName")    || "").trim();
         const domain      = String(form.get("domain")      || "").trim();
@@ -43,42 +43,40 @@ export async function action({ request, context }: Route.ActionArgs) {
         const sendEmail   = form.get("sendWelcome") === "on";
 
         if (!siteName || !domain || !clientName || !clientEmail || !password)
-            return data({ error: "Todos os campos são obrigatórios." }, { status: 400 });
+            return data({ intent: "create" as const, error: "Todos os campos são obrigatórios." }, { status: 400 });
         if (!clientEmail.includes("@"))
-            return data({ error: "Email inválido." }, { status: 400 });
+            return data({ intent: "create" as const, error: "Email inválido." }, { status: 400 });
         if (password.length < 8)
-            return data({ error: "A password deve ter pelo menos 8 caracteres." }, { status: 400 });
+            return data({ intent: "create" as const, error: "A password deve ter pelo menos 8 caracteres." }, { status: 400 });
 
         const existing = await getUserByEmail(db, clientEmail);
-
         let ownerId: number;
         let isNewUser = false;
 
         if (existing) {
             if (existing.role !== "client")
                 return data(
-                    { error: "Este email já existe mas não é um utilizador cliente." },
+                    { intent: "create" as const, error: "Este email já existe mas não é um utilizador cliente." },
                     { status: 400 }
                 );
             ownerId = existing.id;
         } else {
             const passwordHash = await hashPassword(password);
-            ownerId    = await createClientUser(db, { name: clientName, email: clientEmail, passwordHash });
-            isNewUser  = true;
+            ownerId   = await createClientUser(db, { name: clientName, email: clientEmail, passwordHash });
+            isNewUser = true;
         }
 
-        const { token: siteToken } = await createSiteWithOwner(db, { name: siteName, domain, ownerId });
+        await createSiteWithOwner(db, { name: siteName, domain, ownerId });
 
-        // Email de boas-vindas (opcional, controlado por checkbox)
         if (isNewUser && sendEmail && env.RESEND_API_KEY) {
             try {
                 await sendWelcome({
-                    apiKey:      env.RESEND_API_KEY,
-                    from:        env.FROM_EMAIL,
-                    to:          clientEmail,
+                    apiKey:     env.RESEND_API_KEY,
+                    from:       env.FROM_EMAIL,
+                    to:         clientEmail,
                     clientName,
-                    password,          // password em claro só neste email inicial
-                    baseUrl:     env.BASE_URL,
+                    password,
+                    baseUrl:    env.BASE_URL,
                 });
             } catch (err) {
                 console.error("Erro ao enviar email de boas-vindas:", err);
@@ -88,14 +86,13 @@ export async function action({ request, context }: Route.ActionArgs) {
         return redirect("/admin/clients");
     }
 
-    // ── Reset de password ─────────────────────────────────────────
     if (intent === "resetPassword") {
         const userId = Number(form.get("userId"));
         const email  = String(form.get("userEmail") || "");
         const name   = String(form.get("userName")  || "");
 
         if (!userId || !email)
-            return data({ resetError: "Dados inválidos." }, { status: 400 });
+            return data({ intent: "reset" as const, resetError: "Dados inválidos." }, { status: 400 });
 
         const token = crypto.randomUUID().replace(/-/g, "");
         await setResetToken(db, userId, token);
@@ -103,31 +100,33 @@ export async function action({ request, context }: Route.ActionArgs) {
         if (env.RESEND_API_KEY) {
             try {
                 await sendPasswordReset({
-                    apiKey:      env.RESEND_API_KEY,
-                    from:        env.FROM_EMAIL,
-                    to:          email,
-                    clientName:  name,
-                    resetToken:  token,
-                    baseUrl:     env.BASE_URL,
+                    apiKey:     env.RESEND_API_KEY,
+                    from:       env.FROM_EMAIL,
+                    to:         email,
+                    clientName: name,
+                    resetToken: token,
+                    baseUrl:    env.BASE_URL,
                 });
-                return data({ resetSuccess: `Email enviado para ${email}.` });
+                return data({ intent: "reset" as const, resetSuccess: `Email enviado para ${email}.`, resetLink: null });
             } catch (err) {
                 console.error("Erro ao enviar email de reset:", err);
-                return data({ resetError: "Erro ao enviar email. Verifica o RESEND_API_KEY." }, { status: 500 });
+                return data(
+                    { intent: "reset" as const, resetError: "Erro ao enviar email. Verifica o RESEND_API_KEY." },
+                    { status: 500 }
+                );
             }
         }
 
-        // Se não houver Resend configurado, mostra o link para copiar
         return data({
+            intent: "reset" as const,
             resetSuccess: null,
             resetLink: `${env.BASE_URL}/portal/reset-password?token=${token}`,
         });
     }
 
-    // ── Apagar site ───────────────────────────────────────────────
     if (intent === "delete") {
         const id = Number(form.get("id"));
-        if (!id) return data({ error: "ID inválido." }, { status: 400 });
+        if (!id) return data({ intent: "delete" as const, error: "ID inválido." }, { status: 400 });
         await deleteSite(db, id);
         return redirect("/admin/clients");
     }
@@ -151,30 +150,27 @@ function CopyButton({ value, label = "" }: { value: string; label?: string }) {
             className="ml-1.5 inline-flex items-center gap-1 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors text-xs"
             title={label || "Copiar"}
         >
-            {copied
-                ? <><Check size={13} className="text-green-500" />{label && <span className="text-green-500">Copiado!</span>}</>
-                : <><Copy size={13} />{label && <span>{label}</span>}</>}
+            {copied ? (
+                <><Check size={13} className="text-green-500" />{label && <span className="text-green-500">Copiado!</span>}</>
+            ) : (
+                <><Copy size={13} />{label && <span>{label}</span>}</>
+            )}
         </button>
     );
 }
 
-// Linha da tabela com botão de reset inline
 function SiteRow({
                      site,
-                     onResetDone,
                  }: {
     site: ReturnType<typeof useLoaderData<typeof loader>>["sites"][number];
-    onResetDone?: (msg: string) => void;
 }) {
     return (
         <tr className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
             <td className="px-6 py-4 font-medium">{site.name}</td>
             <td className="px-6 py-4">
-                {site.owner_name ? (
-                    <span className="text-gray-700 dark:text-gray-300">{site.owner_name}</span>
-                ) : (
-                    <span className="italic text-gray-300 dark:text-gray-600">sem dono</span>
-                )}
+                {site.owner_name
+                    ? <span className="text-gray-700 dark:text-gray-300">{site.owner_name}</span>
+                    : <span className="italic text-gray-300 dark:text-gray-600">sem dono</span>}
             </td>
             <td className="px-6 py-4 text-gray-500 text-xs">{site.domain}</td>
             <td className="px-6 py-4">
@@ -197,7 +193,6 @@ function SiteRow({
             </td>
             <td className="px-6 py-4">
                 <div className="flex items-center justify-end gap-3">
-                    {/* Reset de password — só se existir dono */}
                     {site.owner_id && (
                         <Form method="post">
                             <input type="hidden" name="intent"    value="resetPassword" />
@@ -215,7 +210,6 @@ function SiteRow({
                         </Form>
                     )}
 
-                    {/* Apagar site */}
                     <Form
                         method="post"
                         onSubmit={(e) => !confirm("Remover este site?") && e.preventDefault()}
@@ -239,10 +233,16 @@ function SiteRow({
 // ── Página principal ────────────────────────────────────────────
 
 export default function AdminClients() {
-    const { sites }  = useLoaderData<typeof loader>();
-    const result     = useActionData<typeof action>();
+    const { sites } = useLoaderData<typeof loader>();
+    const result    = useActionData<typeof action>();
     const [showPass, setShowPass] = useState(false);
     const [showForm, setShowForm] = useState(sites.length === 0);
+
+    // Extrair valores do result de forma type-safe
+    const createError  = result?.intent === "create" && "error"        in result ? result.error        : null;
+    const resetSuccess = result?.intent === "reset"  && "resetSuccess" in result ? result.resetSuccess : null;
+    const resetError   = result?.intent === "reset"  && "resetError"   in result ? result.resetError   : null;
+    const resetLink    = result?.intent === "reset"  && "resetLink"    in result ? result.resetLink    : null;
 
     return (
         <div>
@@ -259,25 +259,24 @@ export default function AdminClients() {
                 </button>
             </div>
 
-            {/* Feedback de reset de password */}
-            {result?.resetSuccess && (
+            {/* Feedback reset de password */}
+            {resetSuccess && (
                 <div className="flex items-center gap-2 mb-6 px-4 py-3 bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400 text-sm rounded-xl border border-green-200 dark:border-green-900">
                     <MailCheck size={16} />
-                    {result.resetSuccess}
+                    {resetSuccess}
                 </div>
             )}
-            {result?.resetError && (
+            {resetError && (
                 <div className="mb-6 px-4 py-3 bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 text-sm rounded-xl border border-red-200 dark:border-red-900">
-                    {result.resetError}
+                    {resetError}
                 </div>
             )}
-            {/* Fallback: RESEND não configurado — mostra link para copiar */}
-            {result?.resetLink && (
+            {resetLink && (
                 <div className="mb-6 px-4 py-3 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 text-sm rounded-xl border border-amber-200 dark:border-amber-800">
                     <p className="font-medium mb-1">RESEND_API_KEY não configurado — copia o link manualmente:</p>
                     <div className="flex items-center gap-2 font-mono text-xs bg-white dark:bg-gray-900 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2 break-all">
-                        {result.resetLink}
-                        <CopyButton value={result.resetLink} label="Copiar" />
+                        {resetLink}
+                        <CopyButton value={resetLink} label="Copiar" />
                     </div>
                 </div>
             )}
@@ -287,15 +286,16 @@ export default function AdminClients() {
                 <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 mb-8">
                     <h2 className="font-semibold mb-1">Adicionar cliente e site</h2>
                     <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
-                        Cria o utilizador do cliente e associa logo o site via <code className="text-xs bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded">owner_id</code>.
+                        Cria o utilizador do cliente e associa logo o site via{" "}
+                        <code className="text-xs bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded">owner_id</code>.
                     </p>
 
                     <Form method="post" className="space-y-5">
                         <input type="hidden" name="intent" value="create" />
 
-                        {result?.error && (
+                        {createError && (
                             <div className="text-sm text-red-600 bg-red-50 dark:bg-red-950/30 dark:text-red-400 px-4 py-2.5 rounded-lg">
-                                {result.error}
+                                {createError}
                             </div>
                         )}
 
@@ -383,7 +383,6 @@ export default function AdminClients() {
                                 </div>
                             </div>
 
-                            {/* Opção: enviar email de boas-vindas */}
                             <label className="flex items-center gap-2 mt-3 cursor-pointer select-none">
                                 <input
                                     type="checkbox"
