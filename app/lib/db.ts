@@ -275,12 +275,11 @@ export async function createTicketMessage(
     db: D1Database,
     data: { ticketId: number; sender: "admin" | "client"; message: string }
 ): Promise<number> {
-    await db
-        .prepare(
-            "INSERT INTO ticket_messages (ticket_id, sender, message) VALUES (?, ?, ?)"
-        )
+    const r = await db
+        .prepare("INSERT INTO ticket_messages (ticket_id, sender, message) VALUES (?, ?, ?)")
         .bind(data.ticketId, data.sender, data.message)
         .run();
+    return Number(r.meta.last_row_id);
 }
 
 export async function updateTicketStatus(
