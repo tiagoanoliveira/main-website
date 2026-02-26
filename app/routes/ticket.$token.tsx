@@ -10,7 +10,7 @@ import { getSessionUser } from "~/lib/auth.server";
 import StatusBadge from "~/components/ui/StatusBadge";
 import { motion } from "motion/react";
 import { Loader2, Send, Paperclip, FileText, Image } from "lucide-react";
-import { useRef } from "react";
+import { useRef, useEffect } from "react";
 
 export async function loader({ params, context }: Route.LoaderArgs) {
     const db      = context.cloudflare.env.DB;
@@ -109,7 +109,13 @@ export default function TicketPublic() {
     const isLoading = nav.state === "submitting";
     const formRef   = useRef<HTMLFormElement>(null);
 
-    // Limpa o formulário após redirect (o redirect já limpa, mas o ref serve de fallback)
+    // Limpa o formulário após submissão bem-sucedida
+    useEffect(() => {
+        if (nav.state === "idle" && !result?.error) {
+            formRef.current?.reset();
+        }
+    }, [nav.state, result?.error]);
+
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-950 px-4 py-12">
             <div className="max-w-2xl mx-auto">

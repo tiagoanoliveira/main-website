@@ -21,8 +21,8 @@ export interface Site {
     owner_id: number | null;
     owner_name: string | null;
     owner_email: string | null;
-    brand_color: string | null;   // ← novo
-    logo_r2_key: string | null;   // ← novo
+    brand_color: string | null;
+    logo_r2_key: string | null;
     created_at: string;
 }
 
@@ -42,7 +42,7 @@ export interface Ticket {
 export interface TicketMessage {
     id: number;
     ticket_id: number;
-    sender: "admin" | "client" | "owner"; // ← "owner" adicionado
+    sender: "admin" | "client" | "owner";
     message: string;
     is_read: number;
     created_at: string;
@@ -227,16 +227,29 @@ export async function createSite(
 
 export async function createSiteWithOwner(
     db: D1Database,
-    data: { name: string; domain: string; ownerId: number }
+    data: { name: string; domain: string; ownerId: number; brandColor?: string; logoR2Key?: string }
 ): Promise<{ siteId: number; token: string }> {
     const token = crypto.randomUUID().replace(/-/g, "");
     const r = await db
         .prepare(
-            "INSERT INTO sites (name, domain, token, owner_id) VALUES (?, ?, ?, ?)"
+            "INSERT INTO sites (name, domain, token, owner_id, brand_color, logo_r2_key) VALUES (?, ?, ?, ?, ?, ?)"
         )
-        .bind(data.name, data.domain, token, data.ownerId)
+        .bind(data.name, data.domain, token, data.ownerId, data.brandColor ?? null, data.logoR2Key ?? null)
         .run();
     return { siteId: Number(r.meta.last_row_id), token };
+}
+
+export async function updateSite(
+    db: D1Database,
+    id: number,
+    data: { name: string; domain: string; brandColor?: string | null; logoR2Key?: string | null }
+): Promise<void> {
+    const sets: string[] = ["name = ?", "domain = ?"];
+    const vals: (string | number | null)[] = [data.name, data.domain];
+    if (data.brandColor !== undefined) { sets.push("brand_color = ?"); vals.push(data.brandColor); }
+    if (data.logoR2Key  !== undefined) { sets.push("logo_r2_key = ?");  vals.push(data.logoR2Key); }
+    vals.push(id);
+    await db.prepare(`UPDATE sites SET ${sets.join(", ")} WHERE id = ?`).bind(...vals).run();
 }
 
 export async function updateSiteBranding(
@@ -432,6 +445,19 @@ export async function createInvoice(
         .bind(data.siteId, data.description, data.amount, data.dueDate)
         .run();
     return Number(r.meta.last_row_id);
+}
+
+export async function updateInvoice(
+    db: D1Database,
+    id: number,
+    data: { description: string; amount: number; dueDate: string | null; status: string }
+): Promise<void> {
+    await db
+        .prepare(
+            `UPDATE invoices SET description = ?, amount = ?, due_date = ?, status = ? WHERE id = ?`
+        )
+        .bind(data.description, data.amount, data.dueDate, data.status, id)
+        .run();
 }
 
 export async function markInvoicePaid(db: D1Database, id: number): Promise<void> {
