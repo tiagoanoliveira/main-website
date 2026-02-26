@@ -8,6 +8,8 @@ export interface ClientUser {
     email: string;
     role: "admin" | "client" | string;
     password_hash: string;
+    reset_token: string | null;
+    reset_token_expires: string | null;
     created_at: string;
 }
 
@@ -18,7 +20,9 @@ export interface Site {
     token: string;
     owner_id: number | null;
     owner_name: string | null;
-    owner_email: string | null; // ← obrigatório para reset pw
+    owner_email: string | null;
+    brand_color: string | null;   // ← novo
+    logo_r2_key: string | null;   // ← novo
     created_at: string;
 }
 
@@ -38,7 +42,7 @@ export interface Ticket {
 export interface TicketMessage {
     id: number;
     ticket_id: number;
-    sender: "admin" | "client";
+    sender: "admin" | "client" | "owner"; // ← "owner" adicionado
     message: string;
     is_read: number;
     created_at: string;
@@ -74,7 +78,7 @@ function inClausePlaceholders(n: number): string {
     return Array.from({ length: n }, () => "?").join(",");
 }
 
-// ── Users (clientes) ───────────────────────────────────────────
+// ── Users ──────────────────────────────────────────────────────
 
 export async function getUserByEmail(
     db: D1Database,
@@ -106,7 +110,7 @@ export async function setResetToken(
     userId: number,
     token: string
 ): Promise<void> {
-    const expires = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(); // 2h
+    const expires = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
     await db
         .prepare(
             "UPDATE users SET reset_token = ?, reset_token_expires = ? WHERE id = ?"
@@ -122,7 +126,8 @@ export async function getUserByResetToken(
     return db
         .prepare(
             `SELECT id, email, name FROM users
-             WHERE reset_token = ? AND reset_token_expires > datetime('now')`
+             WHERE reset_token = ?
+               AND reset_token_expires > datetime('now')`
         )
         .bind(token)
         .first<{ id: number; email: string; name: string }>();
@@ -136,8 +141,10 @@ export async function clearResetToken(
     await db
         .prepare(
             `UPDATE users
-       SET password_hash = ?, reset_token = NULL, reset_token_expires = NULL
-       WHERE id = ?`
+             SET password_hash = ?,
+                 reset_token = NULL,
+                 reset_token_expires = NULL
+             WHERE id = ?`
         )
         .bind(newPasswordHash, userId)
         .run();
@@ -149,9 +156,9 @@ export async function getSites(db: D1Database): Promise<Site[]> {
     const r = await db
         .prepare(
             `SELECT s.*, u.name AS owner_name, u.email AS owner_email
-       FROM sites s
-       LEFT JOIN users u ON s.owner_id = u.id
-       ORDER BY s.created_at DESC`
+             FROM sites s
+                      LEFT JOIN users u ON s.owner_id = u.id
+             ORDER BY s.created_at DESC`
         )
         .all<Site>();
     return r.results;
@@ -164,9 +171,9 @@ export async function getSiteById(
     return db
         .prepare(
             `SELECT s.*, u.name AS owner_name, u.email AS owner_email
-       FROM sites s
-       LEFT JOIN users u ON s.owner_id = u.id
-       WHERE s.id = ?`
+             FROM sites s
+                      LEFT JOIN users u ON s.owner_id = u.id
+             WHERE s.id = ?`
         )
         .bind(id)
         .first<Site>();
@@ -179,9 +186,9 @@ export async function getSiteByToken(
     return db
         .prepare(
             `SELECT s.*, u.name AS owner_name, u.email AS owner_email
-       FROM sites s
-       LEFT JOIN users u ON s.owner_id = u.id
-       WHERE s.token = ?`
+             FROM sites s
+                      LEFT JOIN users u ON s.owner_id = u.id
+             WHERE s.token = ?`
         )
         .bind(token)
         .first<Site>();
@@ -194,17 +201,16 @@ export async function getSitesByOwner(
     const r = await db
         .prepare(
             `SELECT s.*, u.name AS owner_name, u.email AS owner_email
-       FROM sites s
-       LEFT JOIN users u ON s.owner_id = u.id
-       WHERE s.owner_id = ?
-       ORDER BY s.created_at DESC`
+             FROM sites s
+                      LEFT JOIN users u ON s.owner_id = u.id
+             WHERE s.owner_id = ?
+             ORDER BY s.created_at DESC`
         )
         .bind(userId)
         .all<Site>();
     return r.results;
 }
 
-// Mantém para compatibilidade
 export async function createSite(
     db: D1Database,
     data: { name: string; domain: string; ownerId: number | null }
@@ -233,6 +239,20 @@ export async function createSiteWithOwner(
     return { siteId: Number(r.meta.last_row_id), token };
 }
 
+export async function updateSiteBranding(
+    db: D1Database,
+    siteId: number,
+    data: { brandColor?: string; logoR2Key?: string }
+): Promise<void> {
+    const sets: string[] = [];
+    const vals: (string | number)[] = [];
+    if (data.brandColor !== undefined) { sets.push("brand_color = ?"); vals.push(data.brandColor); }
+    if (data.logoR2Key  !== undefined) { sets.push("logo_r2_key = ?");  vals.push(data.logoR2Key); }
+    if (sets.length === 0) return;
+    vals.push(siteId);
+    await db.prepare(`UPDATE sites SET ${sets.join(", ")} WHERE id = ?`).bind(...vals).run();
+}
+
 export async function deleteSite(db: D1Database, id: number): Promise<void> {
     await db.prepare("DELETE FROM sites WHERE id = ?").bind(id).run();
 }
@@ -244,11 +264,11 @@ export async function getTickets(
     filters?: { siteId?: number; status?: string }
 ): Promise<Ticket[]> {
     let q = `
-    SELECT t.*, s.name AS site_name
-    FROM tickets t
-    JOIN sites s ON t.site_id = s.id
-    WHERE 1=1
-  `;
+        SELECT t.*, s.name AS site_name
+        FROM tickets t
+                 JOIN sites s ON t.site_id = s.id
+        WHERE 1=1
+    `;
     const p: (string | number)[] = [];
     if (filters?.siteId) { q += " AND t.site_id = ?"; p.push(filters.siteId); }
     if (filters?.status) { q += " AND t.status = ?";  p.push(filters.status); }
@@ -264,9 +284,9 @@ export async function getTicketById(
     return db
         .prepare(
             `SELECT t.*, s.name AS site_name
-       FROM tickets t
-       JOIN sites s ON t.site_id = s.id
-       WHERE t.id = ?`
+             FROM tickets t
+                      JOIN sites s ON t.site_id = s.id
+             WHERE t.id = ?`
         )
         .bind(id)
         .first<Ticket>();
@@ -279,9 +299,9 @@ export async function getTicketByPublicToken(
     return db
         .prepare(
             `SELECT t.*, s.name AS site_name
-       FROM tickets t
-       JOIN sites s ON t.site_id = s.id
-       WHERE t.public_token = ?`
+             FROM tickets t
+                      JOIN sites s ON t.site_id = s.id
+             WHERE t.public_token = ?`
         )
         .bind(token)
         .first<Ticket>();
@@ -302,7 +322,7 @@ export async function getTicketMessages(
 
 export async function createTicketMessage(
     db: D1Database,
-    data: { ticketId: number; sender: "admin" | "client"; message: string }
+    data: { ticketId: number; sender: "admin" | "client" | "owner"; message: string }
 ): Promise<number> {
     const r = await db
         .prepare(
@@ -338,16 +358,9 @@ export async function createTicket(
     const r = await db
         .prepare(
             `INSERT INTO tickets (site_id, client_name, client_email, category, description, public_token)
-       VALUES (?, ?, ?, ?, ?, ?)`
+             VALUES (?, ?, ?, ?, ?, ?)`
         )
-        .bind(
-            data.siteId,
-            data.clientName,
-            data.clientEmail,
-            data.category,
-            data.description,
-            publicToken
-        )
+        .bind(data.siteId, data.clientName, data.clientEmail, data.category, data.description, publicToken)
         .run();
     return { id: Number(r.meta.last_row_id), publicToken };
 }
@@ -361,10 +374,10 @@ export async function getTicketsBySiteIds(
     const r = await db
         .prepare(
             `SELECT t.*, s.name AS site_name
-       FROM tickets t
-       JOIN sites s ON t.site_id = s.id
-       WHERE t.site_id IN (${placeholders})
-       ORDER BY t.created_at DESC`
+             FROM tickets t
+                      JOIN sites s ON t.site_id = s.id
+             WHERE t.site_id IN (${placeholders})
+             ORDER BY t.created_at DESC`
         )
         .bind(...siteIds)
         .all<Ticket>();
@@ -378,12 +391,12 @@ export async function getInvoices(
     filters?: { siteId?: number; status?: string }
 ): Promise<Invoice[]> {
     let q = `
-    SELECT i.*, s.name AS site_name, u.name AS owner_name
-    FROM invoices i
-    JOIN sites s ON i.site_id = s.id
-    LEFT JOIN users u ON s.owner_id = u.id
-    WHERE 1=1
-  `;
+        SELECT i.*, s.name AS site_name, u.name AS owner_name
+        FROM invoices i
+                 JOIN sites s ON i.site_id = s.id
+                 LEFT JOIN users u ON s.owner_id = u.id
+        WHERE 1=1
+    `;
     const p: (string | number)[] = [];
     if (filters?.siteId) { q += " AND i.site_id = ?"; p.push(filters.siteId); }
     if (filters?.status) { q += " AND i.status = ?";  p.push(filters.status); }
@@ -399,10 +412,10 @@ export async function getInvoiceById(
     return db
         .prepare(
             `SELECT i.*, s.name AS site_name, u.name AS owner_name
-       FROM invoices i
-       JOIN sites s ON i.site_id = s.id
-       LEFT JOIN users u ON s.owner_id = u.id
-       WHERE i.id = ?`
+             FROM invoices i
+                      JOIN sites s ON i.site_id = s.id
+                      LEFT JOIN users u ON s.owner_id = u.id
+             WHERE i.id = ?`
         )
         .bind(id)
         .first<Invoice>();
@@ -410,12 +423,7 @@ export async function getInvoiceById(
 
 export async function createInvoice(
     db: D1Database,
-    data: {
-        siteId: number;
-        description: string;
-        amount: number;
-        dueDate: string | null;
-    }
+    data: { siteId: number; description: string; amount: number; dueDate: string | null }
 ): Promise<number> {
     const r = await db
         .prepare(
@@ -426,22 +434,14 @@ export async function createInvoice(
     return Number(r.meta.last_row_id);
 }
 
-export async function markInvoicePaid(
-    db: D1Database,
-    id: number
-): Promise<void> {
+export async function markInvoicePaid(db: D1Database, id: number): Promise<void> {
     await db
-        .prepare(
-            "UPDATE invoices SET status = 'paid', paid_at = datetime('now') WHERE id = ?"
-        )
+        .prepare("UPDATE invoices SET status = 'paid', paid_at = datetime('now') WHERE id = ?")
         .bind(id)
         .run();
 }
 
-export async function deleteInvoice(
-    db: D1Database,
-    id: number
-): Promise<void> {
+export async function deleteInvoice(db: D1Database, id: number): Promise<void> {
     await db.prepare("DELETE FROM invoices WHERE id = ?").bind(id).run();
 }
 
@@ -454,11 +454,11 @@ export async function getInvoicesBySiteIds(
     const r = await db
         .prepare(
             `SELECT i.*, s.name AS site_name, u.name AS owner_name
-       FROM invoices i
-       JOIN sites s ON i.site_id = s.id
-       LEFT JOIN users u ON s.owner_id = u.id
-       WHERE i.site_id IN (${placeholders})
-       ORDER BY i.created_at DESC`
+             FROM invoices i
+                      JOIN sites s ON i.site_id = s.id
+                      LEFT JOIN users u ON s.owner_id = u.id
+             WHERE i.site_id IN (${placeholders})
+             ORDER BY i.created_at DESC`
         )
         .bind(...siteIds)
         .all<Invoice>();
@@ -475,10 +475,28 @@ export async function getAttachments(
     const r = await db
         .prepare(
             `SELECT * FROM attachments
-       WHERE entity_type = ? AND entity_id = ?
-       ORDER BY created_at ASC`
+             WHERE entity_type = ? AND entity_id = ?
+             ORDER BY created_at ASC`
         )
         .bind(entityType, entityId)
+        .all<Attachment>();
+    return r.results;
+}
+
+export async function getAttachmentsByEntityIds(
+    db: D1Database,
+    entityType: string,
+    entityIds: number[]
+): Promise<Attachment[]> {
+    if (entityIds.length === 0) return [];
+    const placeholders = inClausePlaceholders(entityIds.length);
+    const r = await db
+        .prepare(
+            `SELECT * FROM attachments
+       WHERE entity_type = ? AND entity_id IN (${placeholders})
+       ORDER BY created_at ASC`
+        )
+        .bind(entityType, ...entityIds)
         .all<Attachment>();
     return r.results;
 }
@@ -499,14 +517,7 @@ export async function createAttachment(
             `INSERT INTO attachments (entity_type, entity_id, file_name, file_type, file_size, r2_key)
        VALUES (?, ?, ?, ?, ?, ?)`
         )
-        .bind(
-            data.entityType,
-            data.entityId,
-            data.fileName,
-            data.fileType,
-            data.fileSize,
-            data.r2Key
-        )
+        .bind(data.entityType, data.entityId, data.fileName, data.fileType, data.fileSize, data.r2Key)
         .run();
     return Number(r.meta.last_row_id);
 }
@@ -522,22 +533,4 @@ export async function deleteAttachment(
     if (!row) return null;
     await db.prepare("DELETE FROM attachments WHERE id = ?").bind(id).run();
     return row.r2_key;
-}
-
-export async function getAttachmentsByEntityIds(
-    db: D1Database,
-    entityType: string,
-    entityIds: number[]
-): Promise<Attachment[]> {
-    if (entityIds.length === 0) return [];
-    const placeholders = inClausePlaceholders(entityIds.length);
-    const r = await db
-        .prepare(
-            `SELECT * FROM attachments
-       WHERE entity_type = ? AND entity_id IN (${placeholders})
-       ORDER BY created_at ASC`
-        )
-        .bind(entityType, ...entityIds)
-        .all<Attachment>();
-    return r.results;
 }
