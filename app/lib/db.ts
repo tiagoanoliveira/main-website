@@ -18,6 +18,7 @@ export interface Site {
     token: string;
     owner_id: number | null;
     owner_name: string | null;
+    owner_email: string | null;
     created_at: string;
 }
 
@@ -56,6 +57,17 @@ export interface Invoice {
     created_at: string;
 }
 
+export interface Attachment {
+    id: number;
+    entity_type: "ticket" | "ticket_message" | "invoice";
+    entity_id: number;
+    file_name: string;
+    file_type: string;
+    file_size: number;
+    r2_key: string;
+    created_at: string;
+}
+
 // ── Users (clientes) ───────────────────────────────────────────
 
 export async function getUserByEmail(
@@ -87,15 +99,15 @@ export async function createClientUser(
 export async function getSites(db: D1Database): Promise<Site[]> {
     const r = await db
         .prepare(`
-      SELECT s.*, u.name as owner_name
-      FROM sites s
-      LEFT JOIN users u ON s.owner_id = u.id
-      ORDER BY s.created_at DESC
-    `)
+            SELECT s.*, u.name AS owner_name, u.email AS owner_email
+            FROM sites s
+                     LEFT JOIN users u ON s.owner_id = u.id
+            ORDER BY s.created_at DESC
+        `)
         .all<Site>();
-
     return r.results;
 }
+
 
 export async function getSiteById(
     db: D1Database,
@@ -262,7 +274,7 @@ export async function getTicketMessages(
 export async function createTicketMessage(
     db: D1Database,
     data: { ticketId: number; sender: "admin" | "client"; message: string }
-): Promise<void> {
+): Promise<number> {
     await db
         .prepare(
             "INSERT INTO ticket_messages (ticket_id, sender, message) VALUES (?, ?, ?)"
@@ -436,4 +448,93 @@ export async function getInvoicesBySiteIds(
         .all<Invoice>();
 
     return r.results;
+}
+
+export async function getAttachments(
+    db: D1Database,
+    entityType: string,
+    entityId: number
+): Promise<Attachment[]> {
+    const r = await db
+        .prepare(
+            "SELECT * FROM attachments WHERE entity_type = ? AND entity_id = ? ORDER BY created_at ASC"
+        )
+        .bind(entityType, entityId)
+        .all<Attachment>();
+    return r.results;
+}
+
+export async function createAttachment(
+    db: D1Database,
+    data: {
+        entityType: string;
+        entityId: number;
+        fileName: string;
+        fileType: string;
+        fileSize: number;
+        r2Key: string;
+    }
+): Promise<number> {
+    const r = await db
+        .prepare(
+            `INSERT INTO attachments (entity_type, entity_id, file_name, file_type, file_size, r2_key)
+       VALUES (?, ?, ?, ?, ?, ?)`
+        )
+        .bind(
+            data.entityType, data.entityId,
+            data.fileName, data.fileType, data.fileSize, data.r2Key
+        )
+        .run();
+    return Number(r.meta.last_row_id);
+}
+
+export async function deleteAttachment(
+    db: D1Database,
+    id: number
+): Promise<string | null> {
+    const row = await db
+        .prepare("SELECT r2_key FROM attachments WHERE id = ?")
+        .bind(id)
+        .first<{ r2_key: string }>();
+    if (!row) return null;
+    await db.prepare("DELETE FROM attachments WHERE id = ?").bind(id).run();
+    return row.r2_key;
+}
+
+export async function setResetToken(
+    db: D1Database,
+    userId: number,
+    token: string
+): Promise<void> {
+    const expires = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(); // 2h
+    await db
+        .prepare("UPDATE users SET reset_token = ?, reset_token_expires = ? WHERE id = ?")
+        .bind(token, expires, userId)
+        .run();
+}
+
+export async function getUserByResetToken(
+    db: D1Database,
+    token: string
+): Promise<{ id: number; email: string; name: string } | null> {
+    return db
+        .prepare(
+            `SELECT id, email, name FROM users
+       WHERE reset_token = ? AND reset_token_expires > datetime('now')`
+        )
+        .bind(token)
+        .first();
+}
+
+export async function clearResetToken(
+    db: D1Database,
+    userId: number,
+    newPasswordHash: string
+): Promise<void> {
+    await db
+        .prepare(
+            "UPDATE users SET password_hash = ?, reset_token = NULL, reset_token_expires = NULL WHERE id = ?"
+        )
+        .bind(newPasswordHash, userId)
+        .run();
 }

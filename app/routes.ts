@@ -21,12 +21,14 @@ export default [
             route("tickets/:id",  "routes/admin.tickets.$id.tsx"),
             route("clients",      "routes/admin.clients.tsx"),
             route("invoices",    "routes/admin.invoices.tsx"),
+            route("uploads/*", "routes/uploads.$key.ts"),
         ]),
     ]),
 
     // Portal do cliente
     route("portal",        "routes/portal._index.tsx"),
     route("portal/logout", "routes/portal.logout.tsx"),
+    route("portal/reset-password", "routes/portal.reset-password.tsx"),
     layout("routes/portal.layout.tsx", [
         ...prefix("portal", [
             route("dashboard", "routes/portal.dashboard.tsx"),

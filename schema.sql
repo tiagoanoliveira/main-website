@@ -55,6 +55,20 @@ CREATE TABLE IF NOT EXISTS sessions (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
+CREATE TABLE IF NOT EXISTS attachments (
+                                           id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                                           entity_type TEXT NOT NULL,   -- 'ticket' | 'ticket_message' | 'invoice'
+                                           entity_id   INTEGER NOT NULL,
+                                           file_name   TEXT NOT NULL,
+                                           file_type   TEXT NOT NULL,   -- 'image/png', 'application/pdf', etc.
+                                           file_size   INTEGER NOT NULL,
+                                           r2_key      TEXT NOT NULL UNIQUE,
+                                           created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_attachments_entity
+    ON attachments(entity_type, entity_id);
+
 -- Adicionar no final do schema.sql
 CREATE INDEX IF NOT EXISTS idx_invoices_site   ON invoices(site_id);
 CREATE INDEX IF NOT EXISTS idx_invoices_status ON invoices(status);

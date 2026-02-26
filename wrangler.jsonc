@@ -3,15 +3,19 @@
 	"name": "main-website",
 	"compatibility_date": "2025-04-04",
 	"main": "./workers/app.ts",
-	"observability": {
-		"enabled": true
-	},
+	"observability": { "enabled": true },
 	"compatibility_flags": ["nodejs_compat"],
 	"d1_databases": [
 		{
 			"binding": "DB",
 			"database_name": "tiago-website",
 			"database_id": "72c70b4f-aa09-4a79-91d7-91a604069826"
+		}
+	],
+	"r2_buckets": [
+		{
+			"binding": "UPLOADS",
+			"bucket_name": "tiago-website-uploads"
 		}
 	],
 	"vars": {
