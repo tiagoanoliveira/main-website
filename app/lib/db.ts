@@ -129,3 +129,39 @@ export async function getTicketByPublicToken(
     WHERE t.public_token = ?
   `).bind(token).first<Ticket>();
 }
+
+// ── Criar ticket (usado no formulário público) ─────────────────
+
+export async function createTicket(
+    db: D1Database,
+    data: {
+        siteId: number;
+        clientName: string;
+        clientEmail: string;
+        category: string;
+        description: string;
+    }
+): Promise<{ id: number; publicToken: string }> {
+    const publicToken = crypto.randomUUID().replace(/-/g, "");
+    const result = await db.prepare(`
+    INSERT INTO tickets (site_id, client_name, client_email, category, description, public_token)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).bind(
+        data.siteId, data.clientName, data.clientEmail,
+        data.category, data.description, publicToken
+    ).run();
+    return { id: Number(result.meta.last_row_id), publicToken };
+}
+
+// ── Buscar site pelo token (usado no widget) ───────────────────
+
+export async function getSiteByToken(
+    db: D1Database,
+    token: string
+): Promise<Site | null> {
+    return db.prepare(`
+    SELECT s.*, u.name as owner_name
+    FROM sites s LEFT JOIN users u ON s.owner_id = u.id
+    WHERE s.token = ?
+  `).bind(token).first<Site>();
+}
