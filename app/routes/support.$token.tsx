@@ -1,9 +1,11 @@
+// app/routes/support.$token.tsx
 import { data, redirect, useLoaderData, useActionData, Form, useNavigation } from "react-router";
 import type { Route } from "./+types/support.$token";
-import { getSiteByToken, createTicket } from "~/lib/db";
+import { getSiteByToken, createTicket, createAttachment } from "~/lib/db";
 import { sendTicketConfirmation } from "~/lib/email";
+import { uploadFile, buildR2Key } from "~/lib/storage";
 import { motion } from "motion/react";
-import { CheckCircle, Loader2 } from "lucide-react";
+import { CheckCircle, Loader2, Paperclip } from "lucide-react";
 
 const CATEGORIES = [
     "Problema com reserva",
@@ -35,17 +37,35 @@ export async function action({ params, request, context }: Route.ActionArgs) {
     const description = String(form.get("description") || "").trim();
 
     const errors: Record<string, string> = {};
-    if (!clientName)                        errors.clientName  = "O nome é obrigatório.";
+    if (!clientName)                             errors.clientName  = "O nome é obrigatório.";
     if (!clientEmail || !clientEmail.includes("@")) errors.clientEmail = "Email inválido.";
-    if (!category)                          errors.category    = "Seleciona uma categoria.";
-    if (description.length < 10)            errors.description = "Descreve o problema com mais detalhe (mínimo 10 caracteres).";
+    if (!category)                               errors.category    = "Seleciona uma categoria.";
+    if (description.length < 10)                 errors.description = "Descreve o problema com mais detalhe (mínimo 10 caracteres).";
     if (Object.keys(errors).length > 0) return data({ errors }, { status: 400 });
 
     const { id, publicToken } = await createTicket(db, {
         siteId: site.id, clientName, clientEmail, category, description,
     });
 
-    // Enviar email de confirmação ao cliente
+    const files = form.getAll("files") as File[];
+    for (const file of files) {
+        if (!(file instanceof File) || file.size === 0) continue;
+        try {
+            const key = buildR2Key("ticket", id, file.name);
+            await uploadFile(env.UPLOADS, key, file);
+            await createAttachment(db, {
+                entityType: "ticket",
+                entityId:   id,
+                fileName:   file.name,
+                fileType:   file.type,
+                fileSize:   file.size,
+                r2Key:      key,
+            });
+        } catch (err) {
+            console.error("Erro ao fazer upload de anexo:", err);
+        }
+    }
+
     if (env.RESEND_API_KEY) {
         await sendTicketConfirmation({
             apiKey:      env.RESEND_API_KEY,
@@ -93,7 +113,7 @@ export default function SupportForm() {
 
                 {/* Formulário */}
                 <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-8 shadow-sm">
-                    <Form method="post" className="space-y-5">
+                    <Form method="post" encType="multipart/form-data" className="space-y-5">
 
                         <div className="grid grid-cols-2 gap-4">
                             {/* Nome */}
@@ -177,6 +197,29 @@ export default function SupportForm() {
                             {errors.description && (
                                 <p className="text-xs text-red-500 mt-1">{errors.description}</p>
                             )}
+                        </div>
+
+                        <div>
+                            <label className="flex items-center gap-1.5 text-sm font-medium mb-1.5">
+                                <Paperclip size={14} />
+                                Anexos <span className="text-gray-400 font-normal">(opcional)</span>
+                            </label>
+                            <input
+                                type="file"
+                                name="files"
+                                multiple
+                                accept=".pdf,.jpg,.jpeg,.png,.webp"
+                                className="text-sm text-gray-500
+                                    file:mr-3 file:py-1.5 file:px-3
+                                    file:rounded-lg file:border-0
+                                    file:text-xs file:font-medium
+                                    file:bg-gray-100 file:text-gray-700
+                                    hover:file:bg-gray-200
+                                    dark:file:bg-gray-800 dark:file:text-gray-300"
+                            />
+                            <p className="text-xs text-gray-400 mt-1">
+                                PDF, JPG, PNG, WebP — máx. 10 MB por ficheiro
+                            </p>
                         </div>
 
                         {/* Botão */}
