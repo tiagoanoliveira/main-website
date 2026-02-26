@@ -15,9 +15,6 @@
 		}
 	],
 	"vars": {
-		"BASE_URL": "https://tiagoanoliveira.pt",
-		"RESEND_API_KEY": "",
-		"FROM_EMAIL":     "",
-		"ADMIN_EMAIL":    ""
+		"BASE_URL": "https://tiagoanoliveira.pt"
 	}
 }
