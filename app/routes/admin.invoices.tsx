@@ -4,6 +4,7 @@ import {
     getInvoices,
     getSites,
     createInvoice,
+    updateInvoice,
     markInvoicePaid,
     deleteInvoice,
     getAttachments,
@@ -14,7 +15,7 @@ import {
 import StatusBadge from "~/components/ui/StatusBadge";
 import Attachments from "~/components/ui/Attachments";
 import { uploadFile, buildR2Key } from "~/lib/storage";
-import { PlusCircle, CheckCheck, Trash2, Paperclip, ChevronDown, ChevronUp } from "lucide-react";
+import { PlusCircle, CheckCheck, Trash2, Paperclip, ChevronDown, ChevronUp, Pencil, X } from "lucide-react";
 import { useState } from "react";
 
 export async function loader({ request, context }: Route.LoaderArgs) {
@@ -27,7 +28,6 @@ export async function loader({ request, context }: Route.LoaderArgs) {
         getSites(db),
     ]);
 
-    // Carregar anexos de todas as faturas de uma vez
     const attachmentsByInvoice: Record<number, Attachment[]> = {};
     await Promise.all(
         invoices.map(async (inv) => {
@@ -58,7 +58,6 @@ export async function action({ request, context }: Route.ActionArgs) {
 
         const invoiceId = await createInvoice(db, { siteId, description, amount, dueDate });
 
-        // Upload de anexos da fatura
         const files = form.getAll("files") as File[];
         for (const file of files) {
             if (!(file instanceof File) || file.size === 0) continue;
@@ -78,6 +77,20 @@ export async function action({ request, context }: Route.ActionArgs) {
             }
         }
 
+        return redirect("/admin/invoices");
+    }
+
+    if (intent === "update") {
+        const id          = Number(form.get("id"));
+        const description = String(form.get("description") || "").trim();
+        const amount      = parseFloat(String(form.get("amount") || "0"));
+        const dueDate     = String(form.get("dueDate") || "").trim() || null;
+        const status      = String(form.get("status") || "pending");
+
+        if (!id || !description || isNaN(amount) || amount <= 0)
+            return data({ error: "Preenche todos os campos corretamente." }, { status: 400 });
+
+        await updateInvoice(db, id, { description, amount, dueDate, status });
         return redirect("/admin/invoices");
     }
 
@@ -103,15 +116,15 @@ export async function action({ request, context }: Route.ActionArgs) {
     return null;
 }
 
-// Linha expansível da tabela com anexos
 function InvoiceRow({
-                        inv,
-                        attachments,
-                    }: {
+    inv,
+    attachments,
+}: {
     inv: ReturnType<typeof useLoaderData<typeof loader>>["invoices"][number];
     attachments: Attachment[];
 }) {
-    const [open, setOpen] = useState(false);
+    const [open, setOpen]       = useState(false);
+    const [editing, setEditing] = useState(false);
     const isOverdue = inv.status === "pending" && inv.due_date && new Date(inv.due_date) < new Date();
 
     return (
@@ -136,7 +149,6 @@ function InvoiceRow({
                 </td>
                 <td className="px-6 py-4">
                     <div className="flex items-center justify-end gap-2">
-                        {/* Indicador de anexos */}
                         {attachments.length > 0 && (
                             <button
                                 type="button"
@@ -149,6 +161,15 @@ function InvoiceRow({
                                 {open ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                             </button>
                         )}
+
+                        <button
+                            type="button"
+                            onClick={() => setEditing((v) => !v)}
+                            className="text-gray-400 hover:text-blue-600 transition-colors"
+                            title="Editar fatura"
+                        >
+                            <Pencil size={14} />
+                        </button>
 
                         {inv.status === "pending" && (
                             <Form method="post">
@@ -180,6 +201,75 @@ function InvoiceRow({
                     </div>
                 </td>
             </tr>
+
+            {/* Linha de edição inline */}
+            {editing && (
+                <tr className="bg-blue-50/50 dark:bg-blue-950/10">
+                    <td colSpan={7} className="px-6 py-4">
+                        <Form method="post" className="flex flex-wrap gap-3 items-end">
+                            <input type="hidden" name="intent" value="update" />
+                            <input type="hidden" name="id"     value={inv.id} />
+
+                            <div>
+                                <label className="block text-xs font-medium mb-1 text-gray-500">Descrição</label>
+                                <input
+                                    name="description"
+                                    defaultValue={inv.description}
+                                    required
+                                    className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium mb-1 text-gray-500">Valor (€)</label>
+                                <input
+                                    name="amount"
+                                    type="number"
+                                    step="0.01"
+                                    min="0.01"
+                                    defaultValue={inv.amount}
+                                    required
+                                    className="w-28 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium mb-1 text-gray-500">Data limite</label>
+                                <input
+                                    name="dueDate"
+                                    type="date"
+                                    defaultValue={inv.due_date?.slice(0, 10) ?? ""}
+                                    className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium mb-1 text-gray-500">Estado</label>
+                                <select
+                                    name="status"
+                                    defaultValue={inv.status}
+                                    className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                >
+                                    <option value="pending">Pendente</option>
+                                    <option value="paid">Pago</option>
+                                </select>
+                            </div>
+                            <div className="flex gap-2">
+                                <button
+                                    type="submit"
+                                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+                                >
+                                    Guardar
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setEditing(false)}
+                                    className="px-4 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                >
+                                    <X size={14} />
+                                </button>
+                            </div>
+                        </Form>
+                    </td>
+                </tr>
+            )}
 
             {/* Linha de expansão dos anexos */}
             {open && attachments.length > 0 && (
@@ -241,9 +331,7 @@ export default function AdminInvoices() {
 
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div>
-                            <label className="block text-xs font-medium mb-1.5 text-gray-500">
-                                Site / Cliente
-                            </label>
+                            <label className="block text-xs font-medium mb-1.5 text-gray-500">Site / Cliente</label>
                             <select
                                 name="siteId"
                                 required
@@ -259,9 +347,7 @@ export default function AdminInvoices() {
                         </div>
 
                         <div>
-                            <label className="block text-xs font-medium mb-1.5 text-gray-500">
-                                Descrição
-                            </label>
+                            <label className="block text-xs font-medium mb-1.5 text-gray-500">Descrição</label>
                             <input
                                 name="description"
                                 placeholder="Manutenção mensal"
@@ -271,9 +357,7 @@ export default function AdminInvoices() {
                         </div>
 
                         <div>
-                            <label className="block text-xs font-medium mb-1.5 text-gray-500">
-                                Valor (€)
-                            </label>
+                            <label className="block text-xs font-medium mb-1.5 text-gray-500">Valor (€)</label>
                             <input
                                 name="amount"
                                 type="number"
@@ -286,9 +370,7 @@ export default function AdminInvoices() {
                         </div>
 
                         <div>
-                            <label className="block text-xs font-medium mb-1.5 text-gray-500">
-                                Data limite (opcional)
-                            </label>
+                            <label className="block text-xs font-medium mb-1.5 text-gray-500">Data limite (opcional)</label>
                             <input
                                 name="dueDate"
                                 type="date"

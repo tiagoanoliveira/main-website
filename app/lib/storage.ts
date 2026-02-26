@@ -15,7 +15,7 @@ export interface UploadResult {
 }
 
 export function buildR2Key(
-    entityType: "ticket" | "ticket_message" | "invoice",
+    entityType: "ticket" | "ticket_message" | "invoice" | "site_logo",
     entityId: number,
     fileName: string
 ): string {
@@ -51,6 +51,5 @@ export async function deleteFile(
 
 // URL pública (só funciona se o bucket for público)
 export function getPublicUrl(baseUrl: string, r2Key: string): string {
-    // Se usares custom domain no R2: return `https://uploads.teusite.pt/${r2Key}`;
     return `${baseUrl}/uploads/${r2Key}`;
 }

@@ -82,16 +82,18 @@ export async function action({ params, request, context }: Route.ActionArgs) {
         }).catch(console.error);
     }
 
-    // Email de notificação ao admin sobre novo ticket
+    // Email de notificação ao admin sobre novo ticket (com isNewTicket: true)
     if (env.RESEND_API_KEY && env.ADMIN_EMAIL) {
         await sendAdminNotification({
-            apiKey:     env.RESEND_API_KEY,
-            from:       env.FROM_EMAIL,
-            adminEmail: env.ADMIN_EMAIL,
+            apiKey:      env.RESEND_API_KEY,
+            from:        env.FROM_EMAIL,
+            adminEmail:  env.ADMIN_EMAIL,
             clientName,
-            ticketId:   id,
-            message:    description,
-            baseUrl:    env.BASE_URL,
+            ticketId:    id,
+            message:     description,
+            baseUrl:     env.BASE_URL,
+            isNewTicket: true,
+            category,
         }).catch(console.error);
     }
 

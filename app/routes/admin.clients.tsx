@@ -4,7 +4,7 @@ import type { Route } from "./+types/admin.clients";
 import { useState } from "react";
 import {
     UserPlus, Trash2, Eye, EyeOff,
-    Copy, Check, KeyRound, MailCheck,
+    Copy, Check, KeyRound, MailCheck, Pencil, X, Code2,
 } from "lucide-react";
 
 import {
@@ -13,10 +13,12 @@ import {
     getUserByEmail,
     createClientUser,
     createSiteWithOwner,
+    updateSite,
     setResetToken,
 } from "~/lib/db";
 import { hashPassword } from "~/lib/auth.server";
 import { sendWelcome, sendPasswordReset } from "~/lib/email";
+import { uploadFile, buildR2Key } from "~/lib/storage";
 
 // ── Loader ─────────────────────────────────────────────────────
 
@@ -41,6 +43,17 @@ export async function action({ request, context }: Route.ActionArgs) {
         const clientEmail = String(form.get("clientEmail") || "").trim().toLowerCase();
         const password    = String(form.get("password")    || "").trim();
         const sendEmail   = form.get("sendWelcome") === "on";
+        const brandColor  = String(form.get("brandColor")  || "").trim() || null;
+
+        // Logo upload
+        let logoR2Key: string | null = null;
+        const logoFile = form.get("logoFile") as File | null;
+        if (logoFile instanceof File && logoFile.size > 0) {
+            try {
+                // We need the site id after creation, so we handle logo after site creation
+                // Placeholder: will be updated below
+            } catch (_) {}
+        }
 
         if (!siteName || !domain || !clientName || !clientEmail || !password)
             return data({ intent: "create" as const, error: "Todos os campos são obrigatórios." }, { status: 400 });
@@ -66,7 +79,19 @@ export async function action({ request, context }: Route.ActionArgs) {
             isNewUser = true;
         }
 
-        await createSiteWithOwner(db, { name: siteName, domain, ownerId });
+        const { siteId } = await createSiteWithOwner(db, { name: siteName, domain, ownerId, brandColor: brandColor ?? undefined });
+
+        // Upload logo agora que temos o siteId
+        if (logoFile instanceof File && logoFile.size > 0) {
+            try {
+                const key = buildR2Key("site_logo", siteId, logoFile.name);
+                await uploadFile(env.UPLOADS, key, logoFile);
+                logoR2Key = key;
+                await updateSite(db, siteId, { name: siteName, domain, brandColor, logoR2Key });
+            } catch (err) {
+                console.error("Erro ao fazer upload do logo:", err);
+            }
+        }
 
         if (isNewUser && sendEmail && env.RESEND_API_KEY) {
             try {
@@ -83,6 +108,32 @@ export async function action({ request, context }: Route.ActionArgs) {
             }
         }
 
+        return redirect("/admin/clients");
+    }
+
+    if (intent === "update") {
+        const id         = Number(form.get("id"));
+        const siteName   = String(form.get("siteName")   || "").trim();
+        const domain     = String(form.get("domain")     || "").trim();
+        const brandColor = String(form.get("brandColor") || "").trim() || null;
+
+        if (!id || !siteName || !domain)
+            return data({ intent: "update" as const, error: "Dados inválidos." }, { status: 400 });
+
+        // Logo upload para edição
+        let logoR2Key: string | undefined = undefined;
+        const logoFile = form.get("logoFile") as File | null;
+        if (logoFile instanceof File && logoFile.size > 0) {
+            try {
+                const key = buildR2Key("site_logo", id, logoFile.name);
+                await uploadFile(env.UPLOADS, key, logoFile);
+                logoR2Key = key;
+            } catch (err) {
+                console.error("Erro ao fazer upload do logo:", err);
+            }
+        }
+
+        await updateSite(db, id, { name: siteName, domain, brandColor, logoR2Key });
         return redirect("/admin/clients");
     }
 
@@ -159,74 +210,205 @@ function CopyButton({ value, label = "" }: { value: string; label?: string }) {
     );
 }
 
-function SiteRow({
-                     site,
-                 }: {
-    site: ReturnType<typeof useLoaderData<typeof loader>>["sites"][number];
-}) {
+function EmbedSnippet({ token, baseUrl }: { token: string; baseUrl: string }) {
+    const [open, setOpen] = useState(false);
+    const snippet = `<iframe\n  src="${baseUrl}/support/${token}"\n  width="100%"\n  height="620"\n  frameborder="0"\n  style="border-radius:12px;border:none;"\n></iframe>`;
     return (
-        <tr className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-            <td className="px-6 py-4 font-medium">{site.name}</td>
-            <td className="px-6 py-4">
-                {site.owner_name
-                    ? <span className="text-gray-700 dark:text-gray-300">{site.owner_name}</span>
-                    : <span className="italic text-gray-300 dark:text-gray-600">sem dono</span>}
-            </td>
-            <td className="px-6 py-4 text-gray-500 text-xs">{site.domain}</td>
-            <td className="px-6 py-4">
-                <div className="flex items-center">
-                    <code className="text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded font-mono">
-                        {site.token.slice(0, 16)}…
-                    </code>
-                    <CopyButton value={site.token} />
+        <>
+            <button
+                type="button"
+                onClick={() => setOpen((v) => !v)}
+                className="flex items-center gap-1 text-xs text-gray-400 hover:text-indigo-600 transition-colors"
+                title="Código para integrar no website"
+            >
+                <Code2 size={14} />
+                <span className="hidden sm:inline">Embed</span>
+            </button>
+            {open && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setOpen(false)}>
+                    <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 max-w-lg w-full mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-between mb-3">
+                            <h3 className="font-semibold text-sm">Código para integrar no website</h3>
+                            <button type="button" onClick={() => setOpen(false)} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
+                        </div>
+                        <p className="text-xs text-gray-500 mb-3">Cola este código no teu website onde queres mostrar o formulário de suporte:</p>
+                        <div className="relative bg-gray-50 dark:bg-gray-800 rounded-xl p-4 font-mono text-xs whitespace-pre-wrap break-all border border-gray-200 dark:border-gray-700">
+                            {snippet}
+                            <div className="absolute top-2 right-2">
+                                <CopyButton value={snippet} label="Copiar" />
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </td>
-            <td className="px-6 py-4">
-                <a
-                    href={`/support/${site.token}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
-                >
-                    Abrir →
-                </a>
-            </td>
-            <td className="px-6 py-4">
-                <div className="flex items-center justify-end gap-3">
-                    {site.owner_id && (
-                        <Form method="post">
-                            <input type="hidden" name="intent"    value="resetPassword" />
-                            <input type="hidden" name="userId"    value={site.owner_id} />
-                            <input type="hidden" name="userEmail" value={site.owner_email ?? ""} />
-                            <input type="hidden" name="userName"  value={site.owner_name ?? ""} />
+            )}
+        </>
+    );
+}
+
+function SiteRow({
+    site,
+    baseUrl,
+}: {
+    site: ReturnType<typeof useLoaderData<typeof loader>>["sites"][number];
+    baseUrl: string;
+}) {
+    const [editing, setEditing] = useState(false);
+
+    return (
+        <>
+            <tr className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                <td className="px-6 py-4">
+                    <div className="flex items-center gap-2">
+                        {site.logo_r2_key && (
+                            <img src={`/uploads/${site.logo_r2_key}`} alt="logo" className="w-6 h-6 rounded object-contain" />
+                        )}
+                        <span className="font-medium">{site.name}</span>
+                        {site.brand_color && (
+                            <span
+                                className="inline-block w-3 h-3 rounded-full border border-gray-200"
+                                style={{ backgroundColor: site.brand_color }}
+                                title={site.brand_color}
+                            />
+                        )}
+                    </div>
+                </td>
+                <td className="px-6 py-4">
+                    {site.owner_name
+                        ? <span className="text-gray-700 dark:text-gray-300">{site.owner_name}</span>
+                        : <span className="italic text-gray-300 dark:text-gray-600">sem dono</span>}
+                </td>
+                <td className="px-6 py-4 text-gray-500 text-xs">{site.domain}</td>
+                <td className="px-6 py-4">
+                    <div className="flex items-center">
+                        <code className="text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded font-mono">
+                            {site.token.slice(0, 16)}…
+                        </code>
+                        <CopyButton value={site.token} />
+                    </div>
+                </td>
+                <td className="px-6 py-4">
+                    <a
+                        href={`/support/${site.token}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                    >
+                        Abrir →
+                    </a>
+                </td>
+                <td className="px-6 py-4">
+                    <div className="flex items-center justify-end gap-3">
+                        <EmbedSnippet token={site.token} baseUrl={baseUrl} />
+
+                        <button
+                            type="button"
+                            onClick={() => setEditing((v) => !v)}
+                            className="flex items-center gap-1 text-xs text-gray-400 hover:text-blue-600 transition-colors"
+                            title="Editar site"
+                        >
+                            <Pencil size={14} />
+                            <span className="hidden sm:inline">Editar</span>
+                        </button>
+
+                        {site.owner_id && (
+                            <Form method="post">
+                                <input type="hidden" name="intent"    value="resetPassword" />
+                                <input type="hidden" name="userId"    value={site.owner_id} />
+                                <input type="hidden" name="userEmail" value={site.owner_email ?? ""} />
+                                <input type="hidden" name="userName"  value={site.owner_name ?? ""} />
+                                <button
+                                    type="submit"
+                                    title="Enviar email de recuperação de password"
+                                    className="flex items-center gap-1 text-xs text-gray-400 hover:text-blue-600 transition-colors"
+                                >
+                                    <KeyRound size={14} />
+                                    <span className="hidden sm:inline">Reset pw</span>
+                                </button>
+                            </Form>
+                        )}
+
+                        <Form
+                            method="post"
+                            onSubmit={(e) => !confirm("Remover este site?") && e.preventDefault()}
+                        >
+                            <input type="hidden" name="intent" value="delete" />
+                            <input type="hidden" name="id"     value={site.id} />
                             <button
                                 type="submit"
-                                title="Enviar email de recuperação de password"
-                                className="flex items-center gap-1 text-xs text-gray-400 hover:text-blue-600 transition-colors"
+                                className="text-gray-400 hover:text-red-500 transition-colors"
+                                title="Remover site"
                             >
-                                <KeyRound size={14} />
-                                <span className="hidden sm:inline">Reset pw</span>
+                                <Trash2 size={15} />
                             </button>
                         </Form>
-                    )}
+                    </div>
+                </td>
+            </tr>
 
-                    <Form
-                        method="post"
-                        onSubmit={(e) => !confirm("Remover este site?") && e.preventDefault()}
-                    >
-                        <input type="hidden" name="intent" value="delete" />
-                        <input type="hidden" name="id"     value={site.id} />
-                        <button
-                            type="submit"
-                            className="text-gray-400 hover:text-red-500 transition-colors"
-                            title="Remover site"
-                        >
-                            <Trash2 size={15} />
-                        </button>
-                    </Form>
-                </div>
-            </td>
-        </tr>
+            {/* Formulário de edição inline */}
+            {editing && (
+                <tr className="bg-blue-50/50 dark:bg-blue-950/10">
+                    <td colSpan={6} className="px-6 py-4">
+                        <Form method="post" encType="multipart/form-data" className="flex flex-wrap gap-3 items-end">
+                            <input type="hidden" name="intent" value="update" />
+                            <input type="hidden" name="id"     value={site.id} />
+
+                            <div>
+                                <label className="block text-xs font-medium mb-1 text-gray-500">Nome do site</label>
+                                <input
+                                    name="siteName"
+                                    defaultValue={site.name}
+                                    required
+                                    className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium mb-1 text-gray-500">Domínio</label>
+                                <input
+                                    name="domain"
+                                    defaultValue={site.domain}
+                                    required
+                                    className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium mb-1 text-gray-500">Cor principal</label>
+                                <input
+                                    name="brandColor"
+                                    type="color"
+                                    defaultValue={site.brand_color ?? "#2563eb"}
+                                    className="h-9 w-16 rounded-lg border border-gray-300 dark:border-gray-700 cursor-pointer p-0.5"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium mb-1 text-gray-500">Logo (PNG/JPG)</label>
+                                <input
+                                    name="logoFile"
+                                    type="file"
+                                    accept=".png,.jpg,.jpeg,.webp"
+                                    className="text-xs text-gray-500 file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-xs file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200"
+                                />
+                            </div>
+                            <div className="flex gap-2">
+                                <button
+                                    type="submit"
+                                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+                                >
+                                    Guardar
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setEditing(false)}
+                                    className="px-4 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                >
+                                    Cancelar
+                                </button>
+                            </div>
+                        </Form>
+                    </td>
+                </tr>
+            )}
+        </>
     );
 }
 
@@ -238,11 +420,14 @@ export default function AdminClients() {
     const [showPass, setShowPass] = useState(false);
     const [showForm, setShowForm] = useState(sites.length === 0);
 
-    // Extrair valores do result de forma type-safe
+    // Detectar BASE_URL do browser para snippet de embed
+    const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
+
     const createError  = result?.intent === "create" && "error"        in result ? result.error        : null;
     const resetSuccess = result?.intent === "reset"  && "resetSuccess" in result ? result.resetSuccess : null;
     const resetError   = result?.intent === "reset"  && "resetError"   in result ? result.resetError   : null;
     const resetLink    = result?.intent === "reset"  && "resetLink"    in result ? result.resetLink    : null;
+    const updateError  = result?.intent === "update" && "error"        in result ? result.error        : null;
 
     return (
         <div>
@@ -259,16 +444,16 @@ export default function AdminClients() {
                 </button>
             </div>
 
-            {/* Feedback reset de password */}
+            {/* Feedback */}
             {resetSuccess && (
                 <div className="flex items-center gap-2 mb-6 px-4 py-3 bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400 text-sm rounded-xl border border-green-200 dark:border-green-900">
                     <MailCheck size={16} />
                     {resetSuccess}
                 </div>
             )}
-            {resetError && (
+            {(resetError || updateError) && (
                 <div className="mb-6 px-4 py-3 bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 text-sm rounded-xl border border-red-200 dark:border-red-900">
-                    {resetError}
+                    {resetError ?? updateError}
                 </div>
             )}
             {resetLink && (
@@ -286,11 +471,10 @@ export default function AdminClients() {
                 <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 mb-8">
                     <h2 className="font-semibold mb-1">Adicionar cliente e site</h2>
                     <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
-                        Cria o utilizador do cliente e associa logo o site via{" "}
-                        <code className="text-xs bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded">owner_id</code>.
+                        Cria o utilizador do cliente e associa logo o site.
                     </p>
 
-                    <Form method="post" className="space-y-5">
+                    <Form method="post" encType="multipart/form-data" className="space-y-5">
                         <input type="hidden" name="intent" value="create" />
 
                         {createError && (
@@ -301,14 +485,10 @@ export default function AdminClients() {
 
                         {/* Dados do site */}
                         <div>
-                            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
-                                Dados do site
-                            </p>
+                            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Dados do site</p>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-xs font-medium mb-1.5 text-gray-600 dark:text-gray-400">
-                                        Nome do site
-                                    </label>
+                                    <label className="block text-xs font-medium mb-1.5 text-gray-600 dark:text-gray-400">Nome do site</label>
                                     <input
                                         name="siteName"
                                         placeholder="Barbearia Brooklyn"
@@ -317,9 +497,7 @@ export default function AdminClients() {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium mb-1.5 text-gray-600 dark:text-gray-400">
-                                        Domínio
-                                    </label>
+                                    <label className="block text-xs font-medium mb-1.5 text-gray-600 dark:text-gray-400">Domínio</label>
                                     <input
                                         name="domain"
                                         placeholder="barbearia-brooklyn.pt"
@@ -330,16 +508,47 @@ export default function AdminClients() {
                             </div>
                         </div>
 
-                        {/* Credenciais do cliente */}
+                        {/* Branding */}
                         <div>
-                            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
-                                Credenciais do cliente
-                            </p>
+                            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Branding (iframe / form de suporte)</p>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div>
-                                    <label className="block text-xs font-medium mb-1.5 text-gray-600 dark:text-gray-400">
-                                        Nome
-                                    </label>
+                                    <label className="block text-xs font-medium mb-1.5 text-gray-600 dark:text-gray-400">Cor principal</label>
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            name="brandColor"
+                                            type="color"
+                                            defaultValue="#2563eb"
+                                            className="h-10 w-16 rounded-lg border border-gray-300 dark:border-gray-700 cursor-pointer p-0.5"
+                                        />
+                                        <span className="text-xs text-gray-400">Cor do botão e ícone no form</span>
+                                    </div>
+                                </div>
+                                <div className="md:col-span-2">
+                                    <label className="block text-xs font-medium mb-1.5 text-gray-600 dark:text-gray-400">Logo do cliente (PNG/JPG/WebP)</label>
+                                    <input
+                                        name="logoFile"
+                                        type="file"
+                                        accept=".png,.jpg,.jpeg,.webp"
+                                        className="w-full text-sm text-gray-500
+                                            file:mr-3 file:py-1.5 file:px-3
+                                            file:rounded-lg file:border-0
+                                            file:text-xs file:font-medium
+                                            file:bg-gray-100 file:text-gray-700
+                                            hover:file:bg-gray-200
+                                            dark:file:bg-gray-800 dark:file:text-gray-300"
+                                    />
+                                    <p className="text-xs text-gray-400 mt-1">Aparece no cabeçalho do form de suporte e no iframe</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Credenciais do cliente */}
+                        <div>
+                            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Credenciais do cliente</p>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label className="block text-xs font-medium mb-1.5 text-gray-600 dark:text-gray-400">Nome</label>
                                     <input
                                         name="clientName"
                                         placeholder="João Silva"
@@ -348,9 +557,7 @@ export default function AdminClients() {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium mb-1.5 text-gray-600 dark:text-gray-400">
-                                        Email
-                                    </label>
+                                    <label className="block text-xs font-medium mb-1.5 text-gray-600 dark:text-gray-400">Email</label>
                                     <input
                                         name="clientEmail"
                                         type="email"
@@ -360,9 +567,7 @@ export default function AdminClients() {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium mb-1.5 text-gray-600 dark:text-gray-400">
-                                        Password inicial
-                                    </label>
+                                    <label className="block text-xs font-medium mb-1.5 text-gray-600 dark:text-gray-400">Password inicial</label>
                                     <div className="relative">
                                         <input
                                             name="password"
@@ -391,8 +596,8 @@ export default function AdminClients() {
                                     className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
                                 />
                                 <span className="text-sm text-gray-600 dark:text-gray-400">
-                  Enviar email de boas-vindas com credenciais de acesso ao portal
-                </span>
+                                    Enviar email de boas-vindas com credenciais de acesso ao portal
+                                </span>
                             </label>
                             <p className="text-xs text-gray-400 mt-1.5">
                                 Se o email já existir (role client), o site é associado ao utilizador existente.
@@ -436,7 +641,7 @@ export default function AdminClients() {
                         </thead>
                         <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                         {sites.map((site) => (
-                            <SiteRow key={site.id} site={site} />
+                            <SiteRow key={site.id} site={site} baseUrl={baseUrl} />
                         ))}
                         </tbody>
                     </table>
