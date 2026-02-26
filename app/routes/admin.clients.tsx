@@ -1,6 +1,23 @@
-import { data, redirect, useLoaderData, useActionData, Form } from "react-router";
+import { data, redirect, useActionData, useLoaderData, Form } from "react-router";
 import type { Route } from "./+types/admin.clients";
-import { getSites, createSite, deleteSite } from "~/lib/db";
+import { useState } from "react";
+import {
+    UserPlus,
+    Trash2,
+    Eye,
+    EyeOff,
+    Copy,
+    Check,
+} from "lucide-react";
+
+import {
+    getSites,
+    deleteSite,
+    getUserByEmail,
+    createClientUser,
+    createSiteWithOwner,
+} from "~/lib/db";
+import { hashPassword } from "~/lib/auth.server";
 
 export async function loader({ context }: Route.LoaderArgs) {
     const db = context.cloudflare.env.DB;
@@ -11,18 +28,53 @@ export async function loader({ context }: Route.LoaderArgs) {
 export async function action({ request, context }: Route.ActionArgs) {
     const db = context.cloudflare.env.DB;
     const form = await request.formData();
-    const intent = String(form.get("intent"));
+    const intent = String(form.get("intent") || "");
 
     if (intent === "create") {
-        const name   = String(form.get("name")   || "").trim();
+        const siteName = String(form.get("siteName") || "").trim();
         const domain = String(form.get("domain") || "").trim();
-        if (!name || !domain) return data({ error: "Nome e domínio são obrigatórios." }, { status: 400 });
-        await createSite(db, { name, domain, ownerId: null });
+
+        const clientName = String(form.get("clientName") || "").trim();
+        const clientEmail = String(form.get("clientEmail") || "").trim().toLowerCase();
+        const password = String(form.get("password") || "").trim();
+
+        if (!siteName || !domain || !clientName || !clientEmail || !password) {
+            return data({ error: "Todos os campos são obrigatórios." }, { status: 400 });
+        }
+        if (!clientEmail.includes("@")) {
+            return data({ error: "Email inválido." }, { status: 400 });
+        }
+        if (password.length < 8) {
+            return data({ error: "A password deve ter pelo menos 8 caracteres." }, { status: 400 });
+        }
+
+        const existing = await getUserByEmail(db, clientEmail);
+
+        let ownerId: number;
+        if (existing) {
+            if (existing.role !== "client") {
+                return data(
+                    { error: "Este email já existe, mas não é um utilizador cliente." },
+                    { status: 400 }
+                );
+            }
+            ownerId = existing.id;
+        } else {
+            const passwordHash = await hashPassword(password);
+            ownerId = await createClientUser(db, {
+                name: clientName,
+                email: clientEmail,
+                passwordHash,
+            });
+        }
+
+        await createSiteWithOwner(db, { name: siteName, domain, ownerId });
         return redirect("/admin/clients");
     }
 
     if (intent === "delete") {
         const id = Number(form.get("id"));
+        if (!id) return data({ error: "ID inválido." }, { status: 400 });
         await deleteSite(db, id);
         return redirect("/admin/clients");
     }
@@ -30,40 +82,174 @@ export async function action({ request, context }: Route.ActionArgs) {
     return null;
 }
 
+function CopyButton({ value }: { value: string }) {
+    const [copied, setCopied] = useState(false);
+
+    const copy = async () => {
+        await navigator.clipboard.writeText(value);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1600);
+    };
+
+    return (
+        <button
+            type="button"
+            onClick={copy}
+            className="ml-2 inline-flex items-center text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+            title="Copiar"
+        >
+            {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
+        </button>
+    );
+}
+
 export default function AdminClients() {
     const { sites } = useLoaderData<typeof loader>();
-    const result    = useActionData<typeof action>();
+    const result = useActionData<typeof action>();
+    const [showPass, setShowPass] = useState(false);
+    const [showForm, setShowForm] = useState(sites.length === 0);
 
     return (
         <div>
             <div className="flex items-center justify-between mb-8">
                 <h1 className="text-2xl font-bold">Clientes & Sites</h1>
+                <button
+                    type="button"
+                    onClick={() => setShowForm((v) => !v)}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl transition-colors"
+                >
+                    <UserPlus size={16} />
+                    Novo Cliente
+                </button>
             </div>
 
-            {/* Formulário novo site */}
-            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 mb-8">
-                <h2 className="font-semibold mb-4">Adicionar novo site</h2>
-                <Form method="post" className="flex flex-wrap gap-3 items-end">
-                    <input type="hidden" name="intent" value="create" />
-                    {result?.error && (
-                        <p className="w-full text-sm text-red-600">{result.error}</p>
-                    )}
-                    <div className="flex-1 min-w-48">
-                        <label className="block text-xs font-medium mb-1 text-gray-500">Nome do site</label>
-                        <input name="name" placeholder="Barbearia Brooklyn" required
-                               className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                    </div>
-                    <div className="flex-1 min-w-48">
-                        <label className="block text-xs font-medium mb-1 text-gray-500">Domínio</label>
-                        <input name="domain" placeholder="barbearia-brooklyn.pt" required
-                               className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                    </div>
-                    <button type="submit"
-                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors">
-                        Criar Site
-                    </button>
-                </Form>
-            </div>
+            {/* Formulário */}
+            {showForm && (
+                <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 mb-8">
+                    <h2 className="font-semibold mb-1">Adicionar cliente e site</h2>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
+                        Cria o utilizador do cliente e associa logo o site (via <code>owner_id</code>).
+                    </p>
+
+                    <Form method="post" className="space-y-5">
+                        <input type="hidden" name="intent" value="create" />
+
+                        {result?.error && (
+                            <div className="text-sm text-red-600 bg-red-50 dark:bg-red-950/30 dark:text-red-400 px-4 py-2.5 rounded-lg">
+                                {result.error}
+                            </div>
+                        )}
+
+                        <div>
+                            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+                                Dados do site
+                            </p>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-medium mb-1.5 text-gray-600 dark:text-gray-400">
+                                        Nome do site
+                                    </label>
+                                    <input
+                                        name="siteName"
+                                        placeholder="Barbearia Brooklyn"
+                                        required
+                                        className="w-full px-3 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-medium mb-1.5 text-gray-600 dark:text-gray-400">
+                                        Domínio
+                                    </label>
+                                    <input
+                                        name="domain"
+                                        placeholder="barbearia-brooklyn.pt"
+                                        required
+                                        className="w-full px-3 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+                                Credenciais do cliente
+                            </p>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label className="block text-xs font-medium mb-1.5 text-gray-600 dark:text-gray-400">
+                                        Nome
+                                    </label>
+                                    <input
+                                        name="clientName"
+                                        placeholder="João Silva"
+                                        required
+                                        className="w-full px-3 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-medium mb-1.5 text-gray-600 dark:text-gray-400">
+                                        Email
+                                    </label>
+                                    <input
+                                        name="clientEmail"
+                                        type="email"
+                                        placeholder="joao@email.com"
+                                        required
+                                        className="w-full px-3 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-medium mb-1.5 text-gray-600 dark:text-gray-400">
+                                        Password inicial
+                                    </label>
+
+                                    <div className="relative">
+                                        <input
+                                            name="password"
+                                            type={showPass ? "text" : "password"}
+                                            placeholder="mín. 8 caracteres"
+                                            required
+                                            className="w-full px-3 py-2.5 pr-10 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPass((v) => !v)}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                                            title={showPass ? "Ocultar" : "Mostrar"}
+                                        >
+                                            {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <p className="text-xs text-gray-400 mt-2">
+                                Se o email já existir (role client), o site é associado ao utilizador existente.
+                            </p>
+                        </div>
+
+                        <div className="flex justify-end gap-3 pt-2">
+                            <button
+                                type="button"
+                                onClick={() => setShowForm(false)}
+                                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="submit"
+                                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl transition-colors"
+                            >
+                                Criar
+                            </button>
+                        </div>
+                    </Form>
+                </div>
+            )}
 
             {/* Lista de sites */}
             {sites.length === 0 ? (
@@ -74,31 +260,55 @@ export default function AdminClients() {
                         <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
                         <tr>
                             <th className="text-left px-6 py-3 font-medium text-gray-500">Site</th>
+                            <th className="text-left px-6 py-3 font-medium text-gray-500">Cliente</th>
                             <th className="text-left px-6 py-3 font-medium text-gray-500">Domínio</th>
                             <th className="text-left px-6 py-3 font-medium text-gray-500">Token do Widget</th>
-                            <th className="text-left px-6 py-3 font-medium text-gray-500">Criado em</th>
+                            <th className="text-left px-6 py-3 font-medium text-gray-500">Form suporte</th>
                             <th className="px-6 py-3" />
                         </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                         {sites.map((site) => (
-                            <tr key={site.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                            <tr
+                                key={site.id}
+                                className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                            >
                                 <td className="px-6 py-4 font-medium">{site.name}</td>
+                                <td className="px-6 py-4 text-gray-500">
+                                    {site.owner_name ?? <span className="italic text-gray-300">sem dono</span>}
+                                </td>
                                 <td className="px-6 py-4 text-gray-500">{site.domain}</td>
                                 <td className="px-6 py-4">
-                                    <code className="text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded font-mono">
-                                        {site.token}
-                                    </code>
+                                    <div className="flex items-center">
+                                        <code className="text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded font-mono">
+                                            {site.token.slice(0, 16)}…
+                                        </code>
+                                        <CopyButton value={site.token} />
+                                    </div>
                                 </td>
-                                <td className="px-6 py-4 text-gray-500">
-                                    {new Date(site.created_at).toLocaleDateString("pt-PT")}
+                                <td className="px-6 py-4">
+                                    <a
+                                        href={`/support/${site.token}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                                    >
+                                        Abrir →
+                                    </a>
                                 </td>
                                 <td className="px-6 py-4 text-right">
-                                    <Form method="post" onSubmit={(e) => !confirm("Tens a certeza?") && e.preventDefault()}>
+                                    <Form
+                                        method="post"
+                                        onSubmit={(e) => !confirm("Remover este site?") && e.preventDefault()}
+                                    >
                                         <input type="hidden" name="intent" value="delete" />
                                         <input type="hidden" name="id" value={site.id} />
-                                        <button type="submit" className="text-xs text-red-500 hover:text-red-700 hover:underline">
-                                            Remover
+                                        <button
+                                            type="submit"
+                                            className="text-gray-400 hover:text-red-500 transition-colors"
+                                            title="Remover"
+                                        >
+                                            <Trash2 size={16} />
                                         </button>
                                     </Form>
                                 </td>

@@ -6,12 +6,10 @@ export default [
         index("routes/home.tsx"),
     ]),
 
-    // Formulário de suporte (sem Navbar/Footer — página standalone)
+    // Suporte público
     route("support/:token",         "routes/support.$token.tsx"),
     route("support/:token/success", "routes/support.$token.success.tsx"),
-
-    // Ticket público via link de email (sem Navbar/Footer)
-    route("ticket/:token", "routes/ticket.$token.tsx"),
+    route("ticket/:token",          "routes/ticket.$token.tsx"),
 
     // Admin
     route("admin",         "routes/admin._index.tsx"),
@@ -22,6 +20,18 @@ export default [
             route("tickets",      "routes/admin.tickets.tsx"),
             route("tickets/:id",  "routes/admin.tickets.$id.tsx"),
             route("clients",      "routes/admin.clients.tsx"),
+            route("invoices",    "routes/admin.invoices.tsx"),
+        ]),
+    ]),
+
+    // Portal do cliente
+    route("portal",        "routes/portal._index.tsx"),
+    route("portal/logout", "routes/portal.logout.tsx"),
+    layout("routes/portal.layout.tsx", [
+        ...prefix("portal", [
+            route("dashboard", "routes/portal.dashboard.tsx"),
+            route("invoices",  "routes/portal.invoices.tsx"),
+            route("tickets",   "routes/portal.tickets.tsx"),
         ]),
     ]),
 ] satisfies RouteConfig;

@@ -54,3 +54,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     expires_at DATETIME NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+
+-- Adicionar no final do schema.sql
+CREATE INDEX IF NOT EXISTS idx_invoices_site   ON invoices(site_id);
+CREATE INDEX IF NOT EXISTS idx_invoices_status ON invoices(status);
