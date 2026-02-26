@@ -3,7 +3,7 @@ import { data } from "react-router";
 import type { Route } from "./+types/uploads.$key";
 import { getSessionUser } from "~/lib/auth.server";
 
-// Captura qualquer path como "pasta/subpasta/ficheiro.pdf"
+// Captura qualquer path após /uploads/ incluindo barras (ex: invoice/2/uuid.png)
 export const unstable_path = "/uploads/*";
 
 export async function loader({ request, params, context }: Route.LoaderArgs) {
@@ -11,13 +11,21 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
     const user = await getSessionUser(env.DB, request);
     if (!user) throw data("Não autorizado", { status: 401 });
 
-    const key = params["*"] ?? "";
+    // params["*"] captura tudo após /uploads/ incluindo barras
+    const key = (params as Record<string, string>)["*"] ?? "";
+    if (!key) throw data("Ficheiro não encontrado", { status: 404 });
+
     const obj = await env.UPLOADS.get(key);
     if (!obj) throw data("Ficheiro não encontrado", { status: 404 });
 
+    const fileName = key.split("/").pop() ?? "ficheiro";
+    const contentType = obj.httpMetadata?.contentType ?? "application/octet-stream";
+
     const headers = new Headers();
-    headers.set("Content-Type", obj.httpMetadata?.contentType ?? "application/octet-stream");
+    headers.set("Content-Type", contentType);
+    // inline = browser tenta mostrar (imagens/PDFs); attachment = força download
+    headers.set("Content-Disposition", `inline; filename="${fileName}"`);
     headers.set("Cache-Control", "private, max-age=3600");
 
-    return new Response(obj.body, { headers });
+    return new Response(obj.body as ReadableStream, { headers });
 }
