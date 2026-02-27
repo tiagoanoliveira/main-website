@@ -118,7 +118,7 @@ export default function SupportForm() {
                     <p className="text-gray-500 dark:text-gray-400 mt-1 text-sm">Preenche o formulário e entraremos em contacto brevemente.</p>
                 </div>
 
-                <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-6 shadow-sm">
+                <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 py-6 px-4 shadow-sm">
                     <Form method="post" encType="multipart/form-data" className="space-y-4">
 
                         {/* Nome + Telefone */}
@@ -131,7 +131,7 @@ export default function SupportForm() {
                                 {errors.clientName && <p className="text-xs text-red-500 mt-1">{errors.clientName}</p>}
                             </div>
                             <div>
-                                <label className="block text-sm font-medium mb-1.5">Telefóne <span className="text-gray-400 font-normal text-xs">(opcional)</span></label>
+                                <label className="block text-sm font-medium mb-1.5">Telefone</label>
                                 <input name="clientPhone" type="tel" autoComplete="tel" placeholder="+351 9xx xxx xxx"
                                     className="w-full px-3 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 text-sm bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors" />
                             </div>
