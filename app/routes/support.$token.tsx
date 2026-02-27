@@ -4,8 +4,8 @@ import type { Route } from "./+types/support.$token";
 import { getSiteByToken, createTicket, createAttachment } from "~/lib/db";
 import { sendTicketConfirmation, sendAdminNotification } from "~/lib/email";
 import { uploadFile, buildR2Key } from "~/lib/storage";
-import { motion } from "motion/react";
 import { Loader2, Paperclip } from "lucide-react";
+import { useEffect } from "react";
 
 const CATEGORIES = [
     "Problema com reserva",
@@ -33,21 +33,25 @@ export async function action({ params, request, context }: Route.ActionArgs) {
     const form        = await request.formData();
     const clientName  = String(form.get("clientName")  || "").trim();
     const clientEmail = String(form.get("clientEmail") || "").trim();
+    const clientPhone = String(form.get("clientPhone") || "").trim();
     const category    = String(form.get("category")    || "").trim();
     const description = String(form.get("description") || "").trim();
 
     const errors: Record<string, string> = {};
-    if (!clientName)                             errors.clientName  = "O nome é obrigatório.";
+    if (!clientName)                               errors.clientName  = "O nome é obrigatório.";
     if (!clientEmail || !clientEmail.includes("@")) errors.clientEmail = "Email inválido.";
-    if (!category)                               errors.category    = "Seleciona uma categoria.";
-    if (description.length < 10)                 errors.description = "Descreve o problema com mais detalhe (mínimo 10 caracteres).";
+    if (!category)                                 errors.category    = "Seleciona uma categoria.";
+    if (description.length < 10)                   errors.description = "Descreve o problema com mais detalhe (mínimo 10 caracteres).";
     if (Object.keys(errors).length > 0) return data({ errors }, { status: 400 });
 
+    const fullDescription = clientPhone
+        ? `${description}\n\n---\nContacto telefónico: ${clientPhone}`
+        : description;
+
     const { id, publicToken } = await createTicket(db, {
-        siteId: site.id, clientName, clientEmail, category, description,
+        siteId: site.id, clientName, clientEmail, category, description: fullDescription,
     });
 
-    // Upload de anexos do ticket inicial
     const files = form.getAll("files") as File[];
     for (const file of files) {
         if (!(file instanceof File) || file.size === 0) continue;
@@ -67,7 +71,6 @@ export async function action({ params, request, context }: Route.ActionArgs) {
         }
     }
 
-    // Email de confirmação ao cliente
     if (env.RESEND_API_KEY) {
         await sendTicketConfirmation({
             apiKey:      env.RESEND_API_KEY,
@@ -76,13 +79,12 @@ export async function action({ params, request, context }: Route.ActionArgs) {
             clientName,
             ticketId:    id,
             category,
-            description,
+            description: fullDescription,
             publicToken,
             baseUrl:     env.BASE_URL,
         }).catch(console.error);
     }
 
-    // Email de notificação ao admin sobre novo ticket (com isNewTicket: true)
     if (env.RESEND_API_KEY && env.ADMIN_EMAIL) {
         await sendAdminNotification({
             apiKey:      env.RESEND_API_KEY,
@@ -90,7 +92,7 @@ export async function action({ params, request, context }: Route.ActionArgs) {
             adminEmail:  env.ADMIN_EMAIL,
             clientName,
             ticketId:    id,
-            message:     description,
+            message:     fullDescription,
             baseUrl:     env.BASE_URL,
             isNewTicket: true,
             category,
@@ -100,6 +102,20 @@ export async function action({ params, request, context }: Route.ActionArgs) {
     return redirect(`/support/${params.token}/success?ticket=${id}`);
 }
 
+/** Envia a altura real do documento para a página pai (quando em iframe) */
+function useIframeResizer() {
+    useEffect(() => {
+        function sendHeight() {
+            const height = document.documentElement.scrollHeight;
+            window.parent.postMessage({ type: "supportFormHeight", height }, "*");
+        }
+        sendHeight();
+        const ro = new ResizeObserver(sendHeight);
+        ro.observe(document.documentElement);
+        return () => ro.disconnect();
+    }, []);
+}
+
 export default function SupportForm() {
     const { site }   = useLoaderData<typeof loader>();
     const result     = useActionData<typeof action>();
@@ -107,18 +123,16 @@ export default function SupportForm() {
     const isLoading  = navigation.state === "submitting";
     const errors     = result?.errors ?? {};
 
+    useIframeResizer();
+
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center px-4 py-12">
-            <motion.div
-                className="w-full max-w-lg"
-                initial={{ opacity: 0, y: 24 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4 }}
-            >
+        <div className="bg-gray-50 dark:bg-gray-950 px-4 py-8">
+            <div className="w-full max-w-lg mx-auto">
+
                 {/* Header */}
-                <div className="text-center mb-8">
+                <div className="text-center mb-6">
                     <div
-                        className="inline-flex items-center justify-center w-12 h-12 rounded-xl mb-4"
+                        className="inline-flex items-center justify-center w-12 h-12 rounded-xl mb-3"
                         style={{ backgroundColor: site.brand_color ?? "#2563eb" }}
                     >
                         {site.logo_r2_key ? (
@@ -131,7 +145,7 @@ export default function SupportForm() {
                             <span className="text-white text-xl">💬</span>
                         )}
                     </div>
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                    <h1 className="text-xl font-bold text-gray-900 dark:text-white">
                         Suporte — {site.name}
                     </h1>
                     <p className="text-gray-500 dark:text-gray-400 mt-1 text-sm">
@@ -140,48 +154,55 @@ export default function SupportForm() {
                 </div>
 
                 {/* Formulário */}
-                <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-8 shadow-sm">
-                    <Form method="post" encType="multipart/form-data" className="space-y-5">
+                <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-6 shadow-sm">
+                    <Form method="post" encType="multipart/form-data" className="space-y-4">
 
-                        <div className="grid grid-cols-2 gap-4">
-                            {/* Nome */}
+                        {/* Nome + Telefone */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-sm font-medium mb-1.5">
                                     Nome <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                     name="clientName"
+                                    autoComplete="name"
                                     placeholder="O teu nome"
-                                    className={`w-full px-4 py-2.5 rounded-xl border text-sm bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
-                                        errors.clientName
-                                            ? "border-red-400 dark:border-red-600"
-                                            : "border-gray-300 dark:border-gray-700"
+                                    className={`w-full px-3 py-2.5 rounded-xl border text-sm bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
+                                        errors.clientName ? "border-red-400 dark:border-red-600" : "border-gray-300 dark:border-gray-700"
                                     }`}
                                 />
-                                {errors.clientName && (
-                                    <p className="text-xs text-red-500 mt-1">{errors.clientName}</p>
-                                )}
+                                {errors.clientName && <p className="text-xs text-red-500 mt-1">{errors.clientName}</p>}
                             </div>
 
-                            {/* Email */}
                             <div>
                                 <label className="block text-sm font-medium mb-1.5">
-                                    Email <span className="text-red-500">*</span>
+                                    Telefóne <span className="text-gray-400 font-normal text-xs">(opcional)</span>
                                 </label>
                                 <input
-                                    name="clientEmail"
-                                    type="email"
-                                    placeholder="teu@email.com"
-                                    className={`w-full px-4 py-2.5 rounded-xl border text-sm bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
-                                        errors.clientEmail
-                                            ? "border-red-400 dark:border-red-600"
-                                            : "border-gray-300 dark:border-gray-700"
-                                    }`}
+                                    name="clientPhone"
+                                    type="tel"
+                                    autoComplete="tel"
+                                    placeholder="+351 9xx xxx xxx"
+                                    className="w-full px-3 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 text-sm bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
                                 />
-                                {errors.clientEmail && (
-                                    <p className="text-xs text-red-500 mt-1">{errors.clientEmail}</p>
-                                )}
                             </div>
+                        </div>
+
+                        {/* Email */}
+                        <div>
+                            <label className="block text-sm font-medium mb-1.5">
+                                Email <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                                name="clientEmail"
+                                type="email"
+                                autoComplete="email"
+                                placeholder="teu@email.com"
+                                className={`w-full px-3 py-2.5 rounded-xl border text-sm bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
+                                    errors.clientEmail ? "border-red-400 dark:border-red-600" : "border-gray-300 dark:border-gray-700"
+                                }`}
+                            />
+                            {errors.clientEmail && <p className="text-xs text-red-500 mt-1">{errors.clientEmail}</p>}
                         </div>
 
                         {/* Categoria */}
@@ -191,10 +212,8 @@ export default function SupportForm() {
                             </label>
                             <select
                                 name="category"
-                                className={`w-full px-4 py-2.5 rounded-xl border text-sm bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
-                                    errors.category
-                                        ? "border-red-400 dark:border-red-600"
-                                        : "border-gray-300 dark:border-gray-700"
+                                className={`w-full px-3 py-2.5 rounded-xl border text-sm bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
+                                    errors.category ? "border-red-400 dark:border-red-600" : "border-gray-300 dark:border-gray-700"
                                 }`}
                             >
                                 <option value="">Seleciona uma categoria…</option>
@@ -202,9 +221,7 @@ export default function SupportForm() {
                                     <option key={c} value={c}>{c}</option>
                                 ))}
                             </select>
-                            {errors.category && (
-                                <p className="text-xs text-red-500 mt-1">{errors.category}</p>
-                            )}
+                            {errors.category && <p className="text-xs text-red-500 mt-1">{errors.category}</p>}
                         </div>
 
                         {/* Descrição */}
@@ -214,23 +231,19 @@ export default function SupportForm() {
                             </label>
                             <textarea
                                 name="description"
-                                rows={5}
+                                rows={4}
                                 placeholder="Descreve o problema com o máximo de detalhe possível…"
-                                className={`w-full px-4 py-3 rounded-xl border text-sm bg-white dark:bg-gray-800 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
-                                    errors.description
-                                        ? "border-red-400 dark:border-red-600"
-                                        : "border-gray-300 dark:border-gray-700"
+                                className={`w-full px-3 py-3 rounded-xl border text-sm bg-white dark:bg-gray-800 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
+                                    errors.description ? "border-red-400 dark:border-red-600" : "border-gray-300 dark:border-gray-700"
                                 }`}
                             />
-                            {errors.description && (
-                                <p className="text-xs text-red-500 mt-1">{errors.description}</p>
-                            )}
+                            {errors.description && <p className="text-xs text-red-500 mt-1">{errors.description}</p>}
                         </div>
 
                         {/* Anexos */}
                         <div>
                             <label className="flex items-center gap-1.5 text-sm font-medium mb-1.5">
-                                <Paperclip size={14} />
+                                <Paperclip size={13} />
                                 Anexos <span className="text-gray-400 font-normal">(opcional)</span>
                             </label>
                             <input
@@ -238,7 +251,7 @@ export default function SupportForm() {
                                 name="files"
                                 multiple
                                 accept=".pdf,.jpg,.jpeg,.png,.webp"
-                                className="text-sm text-gray-500
+                                className="w-full text-sm text-gray-500
                                     file:mr-3 file:py-1.5 file:px-3
                                     file:rounded-lg file:border-0
                                     file:text-xs file:font-medium
@@ -246,26 +259,20 @@ export default function SupportForm() {
                                     hover:file:bg-gray-200
                                     dark:file:bg-gray-800 dark:file:text-gray-300"
                             />
-                            <p className="text-xs text-gray-400 mt-1">
-                                PDF, JPG, PNG, WebP — máx. 10 MB por ficheiro
-                            </p>
+                            <p className="text-xs text-gray-400 mt-1">PDF, JPG, PNG, WebP — máx. 10 MB por ficheiro</p>
                         </div>
 
-                        {/* Botão */}
+                        {/* Botão submit */}
                         <button
                             type="submit"
                             disabled={isLoading}
                             style={{ backgroundColor: isLoading ? undefined : (site.brand_color ?? "#2563eb") }}
-                            className="w-full py-3 disabled:opacity-60 text-white font-medium rounded-xl transition-opacity flex items-center justify-center gap-2"
+                            className="w-full py-3 disabled:opacity-60 text-white font-medium rounded-xl transition-opacity flex items-center justify-center gap-2 text-sm"
                         >
-                            {isLoading ? (
-                                <>
-                                    <Loader2 size={16} className="animate-spin" />
-                                    A enviar…
-                                </>
-                            ) : (
-                                "Enviar Pedido de Suporte"
-                            )}
+                            {isLoading
+                                ? <><Loader2 size={15} className="animate-spin" /> A enviar…</>
+                                : "Enviar Pedido de Suporte"
+                            }
                         </button>
 
                         <p className="text-xs text-center text-gray-400">
@@ -273,7 +280,7 @@ export default function SupportForm() {
                         </p>
                     </Form>
                 </div>
-            </motion.div>
+            </div>
         </div>
     );
 }
