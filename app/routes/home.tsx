@@ -11,6 +11,8 @@ import { Menu, X, User } from "lucide-react";
 export const meta: MetaFunction = () => [
   { title: "Tiago Oliveira" },
   { name: "description", content: "Desenvolvimento de websites, softwares, manutenção de sistemas e suporte técnico para empresas e particulares." },
+  // Garante que o viewport é sempre 100% da largura do dispositivo
+  { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
 ];
 
 const projects = [
@@ -38,7 +40,8 @@ export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-      <>
+      // overflow-x-hidden no wrapper raiz elimina o scroll horizontal em mobile
+      <div className="overflow-x-hidden w-full">
         <ScrollProgressBar />
 
         {/* ───── NAVBAR ───── */}
@@ -114,10 +117,11 @@ export default function Home() {
         </header>
 
         {/* ───── HERO ───── */}
-        <section className="relative min-h-[95vh] flex items-center justify-center px-4 overflow-hidden pt-16">
+        {/* px-4 em vez de overflow-hidden isola os orbs sem cortar conteúdo */}
+        <section className="relative min-h-[95vh] flex items-center justify-center px-4 pt-16">
 
-          {/* Orbs animados no fundo */}
-          <div className="absolute inset-0 pointer-events-none">
+          {/* Orbs animados — pointer-events-none evita qualquer interacção */}
+          <div className="absolute inset-0 pointer-events-none overflow-hidden">
             <motion.div
                 className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full bg-blue-500/20 blur-3xl"
                 animate={{ x: [0, 40, 0], y: [0, -30, 0], scale: [1, 1.1, 1] }}
@@ -137,15 +141,15 @@ export default function Home() {
 
           {/* Grid decorativo */}
           <div
-              className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05]"
+              className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05] pointer-events-none"
               style={{
                 backgroundImage: "linear-gradient(#000 1px, transparent 1px), linear-gradient(90deg, #000 1px, transparent 1px)",
                 backgroundSize: "60px 60px",
               }}
           />
 
-          {/* Conteúdo hero */}
-          <div className="relative text-center max-w-3xl mx-auto">
+          {/* Conteúdo hero — w-full garante que não alarga para além do viewport */}
+          <div className="relative text-center w-full max-w-3xl mx-auto">
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -160,7 +164,7 @@ export default function Home() {
             </motion.div>
 
             <motion.h1
-                className="text-5xl md:text-7xl font-bold mb-6 leading-tight tracking-tight"
+                className="text-4xl sm:text-5xl md:text-7xl font-bold mb-6 leading-tight tracking-tight"
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: 0.1 }}
@@ -173,7 +177,7 @@ export default function Home() {
             </motion.h1>
 
             <motion.p
-                className="text-xl md:text-2xl text-gray-500 dark:text-gray-400 mb-4 font-light"
+                className="text-lg sm:text-xl md:text-2xl text-gray-500 dark:text-gray-400 mb-4 font-light"
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: 0.2 }}
@@ -182,7 +186,7 @@ export default function Home() {
             </motion.p>
 
             <motion.p
-                className="text-base text-gray-400 dark:text-gray-500 mb-10 max-w-xl mx-auto"
+                className="text-sm sm:text-base text-gray-400 dark:text-gray-500 mb-10 max-w-xl mx-auto px-2"
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: 0.3 }}
@@ -191,7 +195,7 @@ export default function Home() {
             </motion.p>
 
             <motion.div
-                className="flex flex-wrap justify-center gap-4"
+                className="flex flex-wrap justify-center gap-3 px-4"
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: 0.4 }}
@@ -200,7 +204,7 @@ export default function Home() {
                   href="#portfolio"
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.97 }}
-                  className="px-7 py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-colors shadow-lg shadow-blue-500/25"
+                  className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-colors shadow-lg shadow-blue-500/25"
               >
                 Ver Portófolio
               </motion.a>
@@ -208,7 +212,7 @@ export default function Home() {
                   href="#contacto"
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.97 }}
-                  className="px-7 py-3.5 border border-gray-300 dark:border-gray-700 rounded-xl font-medium hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
+                  className="px-6 py-3 border border-gray-300 dark:border-gray-700 rounded-xl font-medium hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
               >
                 Contactar
               </motion.a>
@@ -311,18 +315,18 @@ export default function Home() {
         </section>
 
         {/* ───── CONTACTO ───── */}
-        <section id="contacto" className="py-28 px-4">
+        <section id="contacto" className="py-20 sm:py-28 px-4">
           <div className="max-w-2xl mx-auto">
-            <AnimatedSection className="relative rounded-3xl overflow-hidden p-12 text-center bg-gradient-to-br from-blue-600 to-purple-700 shadow-2xl shadow-blue-500/25">
+            <AnimatedSection className="relative rounded-3xl overflow-hidden p-8 sm:p-12 text-center bg-gradient-to-br from-blue-600 to-purple-700 shadow-2xl shadow-blue-500/25">
               <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-48 bg-white/10 rounded-full blur-3xl pointer-events-none" />
               <div className="relative z-10">
-                <h2 className="text-4xl font-bold text-white mb-4">Vamos trabalhar juntos?</h2>
-                <p className="text-blue-100 mb-10 text-lg">Tens um projeto em mente? Fala comigo.</p>
+                <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">Vamos trabalhar juntos?</h2>
+                <p className="text-blue-100 mb-8 sm:mb-10 text-base sm:text-lg">Tens um projeto em mente? Fala comigo.</p>
                 <motion.a
                     href="mailto:geral@tiagoanoliveira.pt"
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.97 }}
-                    className="inline-block px-8 py-4 bg-white text-blue-700 font-semibold rounded-xl hover:bg-blue-50 transition-colors text-lg shadow-xl"
+                    className="inline-block px-6 sm:px-8 py-3 sm:py-4 bg-white text-blue-700 font-semibold rounded-xl hover:bg-blue-50 transition-colors text-base sm:text-lg shadow-xl break-all"
                 >
                   geral@tiagoanoliveira.pt
                 </motion.a>
@@ -330,6 +334,6 @@ export default function Home() {
             </AnimatedSection>
           </div>
         </section>
-      </>
+      </div>
   );
 }

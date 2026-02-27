@@ -12,9 +12,14 @@ export async function sendTicketConfirmation(params: {
 }) {
     const resend = new Resend(params.apiKey);
     const url = `${params.baseUrl}/ticket/${params.publicToken}`;
+    // O reply-to aponta para o endereço de inbound com o ID do ticket no assunto
+    // Para que quando o cliente responda ao email, o worker de email inbound
+    // consiga identificar o ticket através do "#<id>" no assunto
+    const replySubjectHint = `support+ticket${params.ticketId}@tiagoanoliveira.pt`;
     return resend.emails.send({
-        from: params.from,
-        to:   params.to,
+        from:    params.from,
+        to:      params.to,
+        replyTo: replySubjectHint,
         subject: `[Suporte #${params.ticketId}] Pedido recebido — ${params.category}`,
         html: `
       <div style="${style}">
@@ -42,17 +47,20 @@ export async function sendTicketConfirmation(params: {
 // ── Resposta do admin ao cliente ──────────────────────────────
 
 export async function sendAdminReply(params: {
-    apiKey: string; from: string; replyTo: string;
+    apiKey: string; from: string; replyTo?: string;
     to: string; clientName: string;
     ticketId: number; category: string;
     message: string; publicToken: string; baseUrl: string;
 }) {
     const resend = new Resend(params.apiKey);
     const url = `${params.baseUrl}/ticket/${params.publicToken}`;
+    // Reply-to: endereço de inbound para que a resposta do cliente
+    // chegue ao worker com o ID do ticket preservado no assunto
+    const replyTo = `support+ticket${params.ticketId}@tiagoanoliveira.pt`;
     return resend.emails.send({
         from:    params.from,
         to:      params.to,
-        replyTo: params.from,
+        replyTo: replyTo,
         subject: `[Suporte #${params.ticketId}] Nova resposta — ${params.category}`,
         html: `
       <div style="${style}">
