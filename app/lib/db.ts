@@ -1,7 +1,6 @@
 // app/lib/db.ts
 
-// ── Types ──────────────────────────────────────────────────────
-
+// ── Types ────────────────────────────────────────────────────────────────
 export interface ClientUser {
     id: number;
     name: string;
@@ -32,6 +31,7 @@ export interface Ticket {
     site_name: string;
     client_name: string;
     client_email: string;
+    client_phone: string | null;   // ← novo campo
     category: string;
     description: string;
     status: "open" | "in_progress" | "closed";
@@ -72,14 +72,12 @@ export interface Attachment {
     created_at: string;
 }
 
-// ── Utilitários internos ───────────────────────────────────────
-
+// ── Utilitários internos ────────────────────────────────────────────────────────
 function inClausePlaceholders(n: number): string {
     return Array.from({ length: n }, () => "?").join(",");
 }
 
-// ── Users ──────────────────────────────────────────────────────
-
+// ── Users ────────────────────────────────────────────────────────────
 export async function getUserByEmail(
     db: D1Database,
     email: string
@@ -103,8 +101,7 @@ export async function createClientUser(
     return Number(r.meta.last_row_id);
 }
 
-// ── Password reset ─────────────────────────────────────────────
-
+// ── Password reset ──────────────────────────────────────────────────────────
 export async function setResetToken(
     db: D1Database,
     userId: number,
@@ -150,8 +147,7 @@ export async function clearResetToken(
         .run();
 }
 
-// ── Sites ──────────────────────────────────────────────────────
-
+// ── Sites ────────────────────────────────────────────────────────────
 export async function getSites(db: D1Database): Promise<Site[]> {
     const r = await db
         .prepare(
@@ -270,8 +266,7 @@ export async function deleteSite(db: D1Database, id: number): Promise<void> {
     await db.prepare("DELETE FROM sites WHERE id = ?").bind(id).run();
 }
 
-// ── Tickets ────────────────────────────────────────────────────
-
+// ── Tickets ────────────────────────────────────────────────────────────
 export async function getTickets(
     db: D1Database,
     filters?: { siteId?: number; status?: string }
@@ -363,6 +358,7 @@ export async function createTicket(
         siteId: number;
         clientName: string;
         clientEmail: string;
+        clientPhone?: string | null;
         category: string;
         description: string;
     }
@@ -370,10 +366,18 @@ export async function createTicket(
     const publicToken = crypto.randomUUID().replace(/-/g, "");
     const r = await db
         .prepare(
-            `INSERT INTO tickets (site_id, client_name, client_email, category, description, public_token)
-             VALUES (?, ?, ?, ?, ?, ?)`
+            `INSERT INTO tickets (site_id, client_name, client_email, client_phone, category, description, public_token)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`
         )
-        .bind(data.siteId, data.clientName, data.clientEmail, data.category, data.description, publicToken)
+        .bind(
+            data.siteId,
+            data.clientName,
+            data.clientEmail,
+            data.clientPhone ?? null,
+            data.category,
+            data.description,
+            publicToken
+        )
         .run();
     return { id: Number(r.meta.last_row_id), publicToken };
 }
@@ -397,8 +401,7 @@ export async function getTicketsBySiteIds(
     return r.results;
 }
 
-// ── Invoices ───────────────────────────────────────────────────
-
+// ── Invoices ────────────────────────────────────────────────────────────
 export async function getInvoices(
     db: D1Database,
     filters?: { siteId?: number; status?: string }
@@ -491,8 +494,7 @@ export async function getInvoicesBySiteIds(
     return r.results;
 }
 
-// ── Attachments ────────────────────────────────────────────────
-
+// ── Attachments ────────────────────────────────────────────────────────────
 export async function getAttachments(
     db: D1Database,
     entityType: string,
