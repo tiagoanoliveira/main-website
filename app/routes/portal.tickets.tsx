@@ -1,9 +1,11 @@
+// app/routes/portal.tickets.tsx
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/portal.tickets";
 import { getSessionUser } from "~/lib/auth.server";
 import { getSitesByOwner, getTicketsBySiteIds } from "~/lib/db";
 import StatusBadge from "~/components/ui/StatusBadge";
 import { redirect } from "react-router";
+import { MessageSquare } from "lucide-react";
 
 export async function loader({ request, context }: Route.LoaderArgs) {
     const db   = context.cloudflare.env.DB;
@@ -16,11 +18,37 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
 export default function PortalTickets() {
     const { tickets } = useLoaderData<typeof loader>();
+
+    const open       = tickets.filter((t) => t.status === "open").length;
+    const inProgress = tickets.filter((t) => t.status === "in_progress").length;
+    const closed     = tickets.filter((t) => t.status === "closed").length;
+
     return (
         <div>
             <h1 className="text-2xl font-bold mb-8">Os meus Tickets</h1>
+
+            {/* KPIs rápidos */}
+            {tickets.length > 0 && (
+                <div className="grid grid-cols-3 gap-4 mb-8">
+                    {[
+                        { label: "Em aberto",    value: open,       color: open > 0       ? "text-orange-500" : "text-gray-400" },
+                        { label: "Em progresso", value: inProgress, color: inProgress > 0 ? "text-blue-500"   : "text-gray-400" },
+                        { label: "Resolvidos",   value: closed,     color: "text-green-500" },
+                    ].map((kpi) => (
+                        <div key={kpi.label} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4">
+                            <p className="text-xs text-gray-400 mb-1">{kpi.label}</p>
+                            <p className={`text-2xl font-bold ${kpi.color}`}>{kpi.value}</p>
+                        </div>
+                    ))}
+                </div>
+            )}
+
             {tickets.length === 0 ? (
-                <p className="text-center text-gray-400 py-12">Ainda não tens tickets de suporte.</p>
+                <div className="text-center py-16 text-gray-400">
+                    <MessageSquare size={36} className="mx-auto mb-3 opacity-30" />
+                    <p className="text-sm">Ainda não tens tickets de suporte.</p>
+                    <p className="text-xs mt-1">Se tiveres um problema, contacta-nos através do formulário de suporte.</p>
+                </div>
             ) : (
                 <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
                     <table className="w-full text-sm">
@@ -45,8 +73,10 @@ export default function PortalTickets() {
                                     {new Date(t.created_at).toLocaleDateString("pt-PT")}
                                 </td>
                                 <td className="px-6 py-4 text-right">
-                                    <a href={`/ticket/${t.public_token}`}
-                                       className="text-blue-600 dark:text-blue-400 hover:underline text-sm font-medium">
+                                    <a
+                                        href={`/ticket/${t.public_token}`}
+                                        className="text-blue-600 dark:text-blue-400 hover:underline text-sm font-medium"
+                                    >
                                         Ver →
                                     </a>
                                 </td>
