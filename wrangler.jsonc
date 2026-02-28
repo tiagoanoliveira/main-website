@@ -20,12 +20,5 @@
 	],
 	"vars": {
 		"BASE_URL": "https://tiagoanoliveira.pt"
-	},
-	"email": [
-		{
-			"type": "send_email",
-			"name": "SEND_EMAIL",
-			"destination_addresses": ["geral@tiagoanoliveira.pt"]
-		}
-	]
+	}
 }

@@ -12,21 +12,20 @@
  *  5. Notifica o admin por email.
  *  6. Se não encontrar ticket, reencaminha para o admin (fallback).
  *
- * Configuração em wrangler.jsonc:
- *   "email": [{ "type": "send_email", "name": "SEND_EMAIL" }]
+ * Deploy:
+ *   wrangler deploy workers/email-inbound.ts --name email-inbound \
+ *     --compatibility-date 2025-04-04 --compatibility-flags nodejs_compat
  *
  * No Cloudflare Dashboard → Email → Email Routing:
- *   - Catch-all ou endereço específico → Worker "email-inbound"
+ *   - Adicionar regra: support@tiagoanoliveira.pt → Worker "email-inbound"
  */
 
 import { EmailMessage } from "cloudflare:email";
-import { createMimeMessage } from "mimetext";
 
 declare global {
     interface Env {
         DB: D1Database;
         UPLOADS: R2Bucket;
-        SEND_EMAIL: SendEmail;
         ADMIN_EMAIL: string;
         FROM_EMAIL: string;
         BASE_URL: string;
@@ -78,7 +77,6 @@ function cleanEmailBody(body: string): string {
     const cleaned: string[] = [];
     for (const line of lines) {
         const trimmed = line.trimStart();
-        // Para em separadores de citação comuns
         if (
             trimmed.startsWith(">") ||
             /^On .+ wrote:$/i.test(trimmed) ||
@@ -104,7 +102,6 @@ async function processAttachments(
     try {
         const raw = await new Response(message.raw).text();
 
-        // Regex para encontrar partes com Content-Disposition: attachment
         const boundaryMatch = raw.match(/boundary=["']?([^"'\s;\r\n]+)/i);
         if (!boundaryMatch) return results;
 
@@ -121,7 +118,6 @@ async function processAttachments(
             const fileName = fileNameMatch[1].trim();
             const fileType = contentTypeMatch ? contentTypeMatch[1].trim() : "application/octet-stream";
 
-            // Isolar o conteúdo base64 após cabeçalhos da parte
             const bodyStart = part.indexOf("\r\n\r\n") !== -1
                 ? part.indexOf("\r\n\r\n") + 4
                 : part.indexOf("\n\n") + 2;
@@ -143,7 +139,7 @@ async function processAttachments(
     return results;
 }
 
-/** Envia notificação ao admin via Resend (sem SDK — fetch direto para não depender de npm) */
+/** Envia notificação ao admin via Resend (fetch direto — sem SDK npm) */
 async function notifyAdmin(env: Env, ticketId: number, clientName: string, clientEmail: string, message: string) {
     if (!env.RESEND_API_KEY || !env.ADMIN_EMAIL) return;
     const url = `${env.BASE_URL}/admin/tickets/${ticketId}`;
@@ -182,23 +178,19 @@ export default {
         const fromAddr = message.from;
         const ticketId = extractTicketId(subject);
 
-        // ── Sem ID de ticket → reencaminhar para admin ──
+        // Sem ID de ticket → reencaminhar para admin
         if (!ticketId) {
-            try {
-                await message.forward(env.ADMIN_EMAIL);
-            } catch (e) {
+            try { await message.forward(env.ADMIN_EMAIL); } catch (e) {
                 console.error("Erro ao reencaminhar email sem ticket ID:", e);
             }
             return;
         }
 
-        // ── Verificar se o ticket existe e o email bate certo ──
+        // Verificar se o ticket existe
         const ticket = await env.DB
             .prepare(
-                `SELECT t.id, t.client_name, t.client_email, t.public_token, t.category,
-                        s.name AS site_name
+                `SELECT t.id, t.client_name, t.client_email, t.public_token, t.category
                  FROM tickets t
-                 JOIN sites s ON t.site_id = s.id
                  WHERE t.id = ?`
             )
             .bind(ticketId)
@@ -208,42 +200,37 @@ export default {
                 client_email: string;
                 public_token: string;
                 category: string;
-                site_name: string;
             }>();
 
         if (!ticket) {
-            // Ticket não encontrado → reencaminhar para admin
             try { await message.forward(env.ADMIN_EMAIL); } catch {}
             return;
         }
 
-        // Validar que o remetente é o cliente do ticket (case-insensitive)
+        // Validar que o remetente é o cliente do ticket
         if (ticket.client_email.toLowerCase() !== fromAddr.toLowerCase()) {
-            // Email de outro remetente → reencaminhar para admin sem criar mensagem
             try { await message.forward(env.ADMIN_EMAIL); } catch {}
             return;
         }
 
-        // ── Extrair corpo ──
+        // Extrair corpo
         const body = await extractTextBody(message);
-        if (!body || body.length < 2) return; // ignorar emails vazios
+        if (!body || body.length < 2) return;
 
-        // ── Criar ticket_message ──
+        // Criar ticket_message
         const msgResult = await env.DB
-            .prepare(
-                "INSERT INTO ticket_messages (ticket_id, sender, message) VALUES (?, 'client', ?)"
-            )
+            .prepare("INSERT INTO ticket_messages (ticket_id, sender, message) VALUES (?, 'client', ?)")
             .bind(ticketId, body)
             .run();
         const newMessageId = Number(msgResult.meta.last_row_id);
 
-        // Se o ticket estava fechado, reabrir
+        // Reabrir ticket se estava fechado
         await env.DB
             .prepare("UPDATE tickets SET status = 'open' WHERE id = ? AND status = 'closed'")
             .bind(ticketId)
             .run();
 
-        // ── Processar anexos ──
+        // Processar anexos
         const attachments = await processAttachments(message, env.UPLOADS, ticketId, newMessageId);
         for (const att of attachments) {
             await env.DB
@@ -255,7 +242,7 @@ export default {
                 .run();
         }
 
-        // ── Notificar admin ──
+        // Notificar admin
         await notifyAdmin(env, ticketId, ticket.client_name, fromAddr, body);
     },
 } satisfies ExportedHandler<Env>;
