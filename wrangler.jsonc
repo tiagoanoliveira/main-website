@@ -20,8 +20,9 @@
 	],
 	"vars": {
 		"BASE_URL": "https://tiagoanoliveira.pt",
-		// Domínio usado no replyTo dos emails: ticket-{id}@<INBOUND_EMAIL_DOMAIN>
-		// Com Cloudflare Email Routing ativo, este é o domínio principal.
-		"INBOUND_EMAIL_DOMAIN": "tiagoanoliveira.pt"
+		// Domínio inbound do Resend (.resend.app gratuito).
+		// O cliente responde para ticket-{id}@garoorexia.resend.app
+		// O Resend entrega via webhook em /api/webhooks/email-inbound
+		"INBOUND_EMAIL_DOMAIN": "garoorexia.resend.app"
 	}
 }
