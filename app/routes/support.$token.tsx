@@ -12,7 +12,7 @@ const CATEGORIES = [
     "Dúvida geral",
     "Acesso / Login",
     "Problema técnico",
-    "Pagamento",
+    "Cartão de fidelização",
     "Retificação / Eliminação de dados",
     "Outro",
 ];
