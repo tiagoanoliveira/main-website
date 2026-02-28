@@ -2,11 +2,15 @@ import { Resend } from "resend";
 
 const style = `font-family:'Inter',-apple-system,sans-serif;max-width:560px;margin:0 auto;color:#111827;`;
 
-// Subdomínio de inbound: reply.tiagoanoliveira.pt
-// O ticket ID fica codificado no local-part para que o webhook saiba a que ticket pertence.
-// MX record: subdomínio reply.tiagoanoliveira.pt → Resend Inbound (não afeta Google MX no domínio principal)
-const INBOUND_DOMAIN = "reply.tiagoanoliveira.pt";
-const replyAddress = (ticketId: number) => `ticket-${ticketId}@${INBOUND_DOMAIN}`;
+/**
+ * Endereço de reply-to para inbound: ticket-{id}@{inboundDomain}
+ * inboundDomain é passado pelas funções abaixo a partir de env.RESEND_INBOUND_DOMAIN
+ * Exemplos:
+ *   - Gratuito (sem DNS):  equipa.resend.app          (obtido em Resend → Receiving)
+ *   - Domínio próprio:    reply.tiagoanoliveira.pt   (requer MX record no subdomínio)
+ */
+const replyAddress = (ticketId: number, inboundDomain: string) =>
+    `ticket-${ticketId}@${inboundDomain}`;
 
 // ── Confirmação ao cliente quando submete ticket ──────────────
 
@@ -15,13 +19,14 @@ export async function sendTicketConfirmation(params: {
     to: string; clientName: string;
     ticketId: number; category: string;
     description: string; publicToken: string; baseUrl: string;
+    inboundDomain: string;  // env.RESEND_INBOUND_DOMAIN
 }) {
     const resend = new Resend(params.apiKey);
     const url = `${params.baseUrl}/ticket/${params.publicToken}`;
     return resend.emails.send({
         from:    params.from,
         to:      params.to,
-        replyTo: replyAddress(params.ticketId),
+        replyTo: replyAddress(params.ticketId, params.inboundDomain),
         subject: `[Suporte #${params.ticketId}] Pedido recebido — ${params.category}`,
         html: `
       <div style="${style}">
@@ -49,17 +54,18 @@ export async function sendTicketConfirmation(params: {
 // ── Resposta do admin ao cliente ──────────────────────────────
 
 export async function sendAdminReply(params: {
-    apiKey: string; from: string; replyTo?: string;
+    apiKey: string; from: string;
     to: string; clientName: string;
     ticketId: number; category: string;
     message: string; publicToken: string; baseUrl: string;
+    inboundDomain: string;  // env.RESEND_INBOUND_DOMAIN
 }) {
     const resend = new Resend(params.apiKey);
     const url = `${params.baseUrl}/ticket/${params.publicToken}`;
     return resend.emails.send({
         from:    params.from,
         to:      params.to,
-        replyTo: replyAddress(params.ticketId),
+        replyTo: replyAddress(params.ticketId, params.inboundDomain),
         subject: `[Suporte #${params.ticketId}] Nova resposta — ${params.category}`,
         html: `
       <div style="${style}">
