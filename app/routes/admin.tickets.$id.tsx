@@ -26,7 +26,6 @@ export async function loader({ params, context }: Route.LoaderArgs) {
 
     if (!ticket) throw data("Ticket não encontrado", { status: 404 });
 
-    // Anexos do ticket principal + de cada mensagem
     const ticketAttachments = await getAttachments(db, "ticket", id);
     const msgAttachments = await Promise.all(
         messages.map((m) => getAttachments(db, "ticket_message", m.id))
@@ -46,11 +45,10 @@ export async function action({ request, params, context }: Route.ActionArgs) {
         const message = String(form.get("message") || "").trim();
         if (!message) return data({ error: "A resposta não pode estar vazia." }, { status: 400 });
 
-        // Criar mensagem e obter o ID
         const msgId = await createTicketMessage(db, { ticketId: id, sender: "admin", message });
         await updateTicketStatus(db, id, "in_progress");
 
-        // Upload de anexos da mensagem
+        // Upload de anexos
         const files = form.getAll("files") as File[];
         for (const file of files) {
             if (!(file instanceof File) || file.size === 0) continue;
@@ -77,16 +75,16 @@ export async function action({ request, params, context }: Route.ActionArgs) {
         } else if (ticket) {
             try {
                 await sendAdminReply({
-                    apiKey:      env.RESEND_API_KEY,
-                    from:        env.FROM_EMAIL,
-                    replyTo:     `ticket-${id}@suporte.tiagoanoliveira.pt`,
-                    to:          ticket.client_email,
-                    clientName:  ticket.client_name,
-                    ticketId:    id,
-                    category:    ticket.category,
+                    apiKey:       env.RESEND_API_KEY,
+                    from:         env.FROM_EMAIL,
+                    to:           ticket.client_email,
+                    clientName:   ticket.client_name,
+                    ticketId:     id,
+                    category:     ticket.category,
                     message,
-                    publicToken: ticket.public_token,
-                    baseUrl:     env.BASE_URL,
+                    publicToken:  ticket.public_token,
+                    baseUrl:      env.BASE_URL,
+                    inboundDomain: env.INBOUND_EMAIL_DOMAIN,
                 });
             } catch (err) {
                 console.error("❌ Erro ao enviar email:", err);
@@ -171,8 +169,6 @@ export default function AdminTicketDetail() {
                         </p>
                     </div>
                 </div>
-
-                {/* Anexos do ticket (submetidos com o formulário de suporte) */}
                 <Attachments
                     attachments={ticketAttachments}
                     entityType="ticket"
@@ -208,8 +204,6 @@ export default function AdminTicketDetail() {
                                     {msg.sender === "admin" ? "Tu" : ticket.client_name} ·{" "}
                                     {new Date(msg.created_at).toLocaleString("pt-PT")}
                                 </p>
-
-                                {/* Anexos da mensagem */}
                                 {msgAttachments[i]?.length > 0 && (
                                     <div className={msg.sender === "admin" ? "mt-3 opacity-90" : "mt-3"}>
                                         <Attachments
@@ -250,7 +244,6 @@ export default function AdminTicketDetail() {
                         className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3"
                     />
 
-                    {/* Upload de anexos */}
                     <div className="mb-4">
                         <label className="flex items-center gap-1.5 text-xs font-medium text-gray-500 mb-1.5">
                             <Paperclip size={12} />

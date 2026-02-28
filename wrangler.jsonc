@@ -19,6 +19,9 @@
 		}
 	],
 	"vars": {
-		"BASE_URL": "https://tiagoanoliveira.pt"
+		"BASE_URL": "https://tiagoanoliveira.pt",
+		// Domínio usado no replyTo dos emails: ticket-{id}@<INBOUND_EMAIL_DOMAIN>
+		// Com Cloudflare Email Routing ativo, este é o domínio principal.
+		"INBOUND_EMAIL_DOMAIN": "tiagoanoliveira.pt"
 	}
 }
