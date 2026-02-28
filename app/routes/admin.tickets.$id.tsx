@@ -1,13 +1,8 @@
 import { data, redirect, useLoaderData, useActionData, Form } from "react-router";
 import type { Route } from "./+types/admin.tickets.$id";
 import {
-    getTicketById,
-    getTicketMessages,
-    createTicketMessage,
-    updateTicketStatus,
-    getAttachments,
-    createAttachment,
-    deleteAttachment,
+    getTicketById, getTicketMessages, createTicketMessage,
+    updateTicketStatus, getAttachments, createAttachment, deleteAttachment,
 } from "~/lib/db";
 import StatusBadge from "~/components/ui/StatusBadge";
 import Attachments from "~/components/ui/Attachments";
@@ -18,25 +13,21 @@ import { Paperclip } from "lucide-react";
 export async function loader({ params, context }: Route.LoaderArgs) {
     const db = context.cloudflare.env.DB;
     const id = Number(params.id);
-
     const [ticket, messages] = await Promise.all([
         getTicketById(db, id),
         getTicketMessages(db, id),
     ]);
-
     if (!ticket) throw data("Ticket não encontrado", { status: 404 });
-
     const ticketAttachments = await getAttachments(db, "ticket", id);
     const msgAttachments = await Promise.all(
         messages.map((m) => getAttachments(db, "ticket_message", m.id))
     );
-
     return { ticket, messages, ticketAttachments, msgAttachments };
 }
 
 export async function action({ request, params, context }: Route.ActionArgs) {
-    const db     = context.cloudflare.env.DB;
-    const env    = context.cloudflare.env;
+    const env    = context.cloudflare.env as unknown as Env;
+    const db     = env.DB;
     const id     = Number(params.id);
     const form   = await request.formData();
     const intent = String(form.get("intent"));
@@ -48,7 +39,6 @@ export async function action({ request, params, context }: Route.ActionArgs) {
         const msgId = await createTicketMessage(db, { ticketId: id, sender: "admin", message });
         await updateTicketStatus(db, id, "in_progress");
 
-        // Upload de anexos
         const files = form.getAll("files") as File[];
         for (const file of files) {
             if (!(file instanceof File) || file.size === 0) continue;
@@ -56,39 +46,28 @@ export async function action({ request, params, context }: Route.ActionArgs) {
                 const key = buildR2Key("ticket_message", msgId, file.name);
                 await uploadFile(env.UPLOADS, key, file);
                 await createAttachment(db, {
-                    entityType: "ticket_message",
-                    entityId:   msgId,
-                    fileName:   file.name,
-                    fileType:   file.type,
-                    fileSize:   file.size,
-                    r2Key:      key,
+                    entityType: "ticket_message", entityId: msgId,
+                    fileName: file.name, fileType: file.type, fileSize: file.size, r2Key: key,
                 });
-            } catch (err) {
-                console.error("Erro ao fazer upload de anexo:", err);
-            }
+            } catch (err) { console.error("[upload] erro:", err); }
         }
 
-        // Enviar email ao cliente
-        const ticket = await getTicketById(db, id);
-        if (!env.RESEND_API_KEY) {
-            console.warn("⚠️  RESEND_API_KEY não configurado — email não enviado.");
-        } else if (ticket) {
-            // Usa o email do site se configurado; caso contrário usa o global FROM_EMAIL
-            const fromEmail = ticket.site_from_email || env.FROM_EMAIL;
-            try {
-                await sendAdminReply({
-                    apiKey:      env.RESEND_API_KEY,
-                    from:        fromEmail,
-                    to:          ticket.client_email,
-                    clientName:  ticket.client_name,
-                    ticketId:    id,
-                    category:    ticket.category,
-                    message,
-                    publicToken: ticket.public_token,
-                    baseUrl:     env.BASE_URL,
-                });
-            } catch (err) {
-                console.error("❌ Erro ao enviar email:", err);
+        if (env.RESEND_API_KEY) {
+            const ticket = await getTicketById(db, id);
+            if (ticket) {
+                const from = ticket.site_from_name
+                    ? `${ticket.site_from_name} <${env.FROM_EMAIL}>`
+                    : env.FROM_EMAIL;
+                try {
+                    await sendAdminReply({
+                        apiKey: env.RESEND_API_KEY, from,
+                        to: ticket.client_email, clientName: ticket.client_name,
+                        ticketId: id, category: ticket.category, message,
+                        publicToken: ticket.public_token, baseUrl: env.BASE_URL,
+                    });
+                } catch (err) {
+                    console.error("[email] erro ao enviar resposta ao cliente:", err);
+                }
             }
         }
 
@@ -131,19 +110,15 @@ export default function AdminTicketDetail() {
                         <h1 className="text-xl font-bold">Ticket #{ticket.id}</h1>
                         <StatusBadge status={ticket.status} />
                     </div>
-                    <p className="text-sm text-gray-500">
-                        {ticket.site_name} · {ticket.category}
-                    </p>
+                    <p className="text-sm text-gray-500">{ticket.site_name} · {ticket.category}</p>
                 </div>
                 <div className="flex gap-2">
                     {statusOptions.map((opt) => (
                         <Form method="post" key={opt.value}>
                             <input type="hidden" name="intent" value="status" />
                             <input type="hidden" name="status" value={opt.value} />
-                            <button
-                                type="submit"
-                                className="px-3 py-1.5 text-xs font-medium border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                            >
+                            <button type="submit"
+                                className="px-3 py-1.5 text-xs font-medium border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                                 {opt.label}
                             </button>
                         </Form>
@@ -205,16 +180,11 @@ export default function AdminTicketDetail() {
                     className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5">
                     <input type="hidden" name="intent" value="reply" />
                     <h2 className="font-semibold mb-3">Responder</h2>
-
                     {result?.error && (
-                        <p className="text-sm text-red-600 bg-red-50 dark:bg-red-950/30 px-4 py-2.5 rounded-lg mb-3">
-                            {result.error}
-                        </p>
+                        <p className="text-sm text-red-600 bg-red-50 dark:bg-red-950/30 px-4 py-2.5 rounded-lg mb-3">{result.error}</p>
                     )}
-
                     <textarea name="message" rows={4} placeholder="Escreve a tua resposta…" required
                         className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3" />
-
                     <div className="mb-4">
                         <label className="flex items-center gap-1.5 text-xs font-medium text-gray-500 mb-1.5">
                             <Paperclip size={12} /> Anexos (opcional)
@@ -223,7 +193,6 @@ export default function AdminTicketDetail() {
                             className="text-sm text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-blue-950 dark:file:text-blue-300" />
                         <p className="text-xs text-gray-400 mt-1">PDF, JPG, PNG, WebP — máx. 10 MB por ficheiro</p>
                     </div>
-
                     <div className="flex justify-end">
                         <button type="submit"
                             className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors">

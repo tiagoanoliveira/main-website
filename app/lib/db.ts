@@ -22,9 +22,9 @@ export interface Site {
     owner_email: string | null;
     brand_color: string | null;
     logo_r2_key: string | null;
-    // Email usado como remetente (FROM) nos emails enviados aos clientes deste site.
-    // Se null, usa o FROM_EMAIL global da env.
-    from_email: string | null;
+    // Nome de exibição usado no campo FROM dos emails (ex: "Suporte Barbearia Brooklyn").
+    // O email real de envio é sempre o FROM_EMAIL global do Worker.
+    from_name: string | null;
     created_at: string;
 }
 
@@ -32,8 +32,7 @@ export interface Ticket {
     id: number;
     site_id: number;
     site_name: string;
-    // Email de envio do site — usado como from + replyTo nos emails ao cliente
-    site_from_email: string | null;
+    site_from_name: string | null;
     client_name: string;
     client_email: string;
     client_phone: string | null;
@@ -87,10 +86,7 @@ export async function getUserByEmail(
     db: D1Database,
     email: string
 ): Promise<ClientUser | null> {
-    return db
-        .prepare("SELECT * FROM users WHERE email = ? LIMIT 1")
-        .bind(email)
-        .first<ClientUser>();
+    return db.prepare("SELECT * FROM users WHERE email = ? LIMIT 1").bind(email).first<ClientUser>();
 }
 
 export async function createClientUser(
@@ -98,9 +94,7 @@ export async function createClientUser(
     data: { name: string; email: string; passwordHash: string }
 ): Promise<number> {
     const r = await db
-        .prepare(
-            "INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, 'client')"
-        )
+        .prepare("INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, 'client')")
         .bind(data.name, data.email, data.passwordHash)
         .run();
     return Number(r.meta.last_row_id);
@@ -108,107 +102,62 @@ export async function createClientUser(
 
 // ── Password reset ───────────────────────────────────────────────────────
 export async function setResetToken(
-    db: D1Database,
-    userId: number,
-    token: string
+    db: D1Database, userId: number, token: string
 ): Promise<void> {
     const expires = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
-    await db
-        .prepare(
-            "UPDATE users SET reset_token = ?, reset_token_expires = ? WHERE id = ?"
-        )
-        .bind(token, expires, userId)
-        .run();
+    await db.prepare("UPDATE users SET reset_token = ?, reset_token_expires = ? WHERE id = ?")
+        .bind(token, expires, userId).run();
 }
 
 export async function getUserByResetToken(
-    db: D1Database,
-    token: string
+    db: D1Database, token: string
 ): Promise<{ id: number; email: string; name: string } | null> {
-    return db
-        .prepare(
-            `SELECT id, email, name FROM users
-             WHERE reset_token = ?
-               AND reset_token_expires > datetime('now')`
-        )
-        .bind(token)
-        .first<{ id: number; email: string; name: string }>();
+    return db.prepare(
+        `SELECT id, email, name FROM users
+         WHERE reset_token = ? AND reset_token_expires > datetime('now')`
+    ).bind(token).first<{ id: number; email: string; name: string }>();
 }
 
 export async function clearResetToken(
-    db: D1Database,
-    userId: number,
-    newPasswordHash: string
+    db: D1Database, userId: number, newPasswordHash: string
 ): Promise<void> {
-    await db
-        .prepare(
-            `UPDATE users
-             SET password_hash = ?,
-                 reset_token = NULL,
-                 reset_token_expires = NULL
-             WHERE id = ?`
-        )
-        .bind(newPasswordHash, userId)
-        .run();
+    await db.prepare(
+        `UPDATE users SET password_hash = ?, reset_token = NULL, reset_token_expires = NULL WHERE id = ?`
+    ).bind(newPasswordHash, userId).run();
 }
 
 // ── Sites ────────────────────────────────────────────────────────────────
 export async function getSites(db: D1Database): Promise<Site[]> {
-    const r = await db
-        .prepare(
-            `SELECT s.*, u.name AS owner_name, u.email AS owner_email
-             FROM sites s
-             LEFT JOIN users u ON s.owner_id = u.id
-             ORDER BY s.created_at DESC`
-        )
-        .all<Site>();
+    const r = await db.prepare(
+        `SELECT s.*, u.name AS owner_name, u.email AS owner_email
+         FROM sites s LEFT JOIN users u ON s.owner_id = u.id
+         ORDER BY s.created_at DESC`
+    ).all<Site>();
     return r.results;
 }
 
-export async function getSiteById(
-    db: D1Database,
-    id: number
-): Promise<Site | null> {
-    return db
-        .prepare(
-            `SELECT s.*, u.name AS owner_name, u.email AS owner_email
-             FROM sites s
-             LEFT JOIN users u ON s.owner_id = u.id
-             WHERE s.id = ?`
-        )
-        .bind(id)
-        .first<Site>();
+export async function getSiteById(db: D1Database, id: number): Promise<Site | null> {
+    return db.prepare(
+        `SELECT s.*, u.name AS owner_name, u.email AS owner_email
+         FROM sites s LEFT JOIN users u ON s.owner_id = u.id
+         WHERE s.id = ?`
+    ).bind(id).first<Site>();
 }
 
-export async function getSiteByToken(
-    db: D1Database,
-    token: string
-): Promise<Site | null> {
-    return db
-        .prepare(
-            `SELECT s.*, u.name AS owner_name, u.email AS owner_email
-             FROM sites s
-             LEFT JOIN users u ON s.owner_id = u.id
-             WHERE s.token = ?`
-        )
-        .bind(token)
-        .first<Site>();
+export async function getSiteByToken(db: D1Database, token: string): Promise<Site | null> {
+    return db.prepare(
+        `SELECT s.*, u.name AS owner_name, u.email AS owner_email
+         FROM sites s LEFT JOIN users u ON s.owner_id = u.id
+         WHERE s.token = ?`
+    ).bind(token).first<Site>();
 }
 
-export async function getSitesByOwner(
-    db: D1Database,
-    userId: number
-): Promise<Site[]> {
-    const r = await db
-        .prepare(
-            `SELECT s.*, u.name AS owner_name, u.email AS owner_email
-             FROM sites s
-             LEFT JOIN users u ON s.owner_id = u.id
-             WHERE s.owner_id = ?
-             ORDER BY s.created_at DESC`
-        )
-        .bind(userId)
-        .all<Site>();
+export async function getSitesByOwner(db: D1Database, userId: number): Promise<Site[]> {
+    const r = await db.prepare(
+        `SELECT s.*, u.name AS owner_name, u.email AS owner_email
+         FROM sites s LEFT JOIN users u ON s.owner_id = u.id
+         WHERE s.owner_id = ? ORDER BY s.created_at DESC`
+    ).bind(userId).all<Site>();
     return r.results;
 }
 
@@ -218,9 +167,7 @@ export async function createSite(
 ): Promise<{ siteId: number; token: string }> {
     const token = crypto.randomUUID().replace(/-/g, "");
     const r = await db
-        .prepare(
-            "INSERT INTO sites (name, domain, token, owner_id) VALUES (?, ?, ?, ?)"
-        )
+        .prepare("INSERT INTO sites (name, domain, token, owner_id) VALUES (?, ?, ?, ?)")
         .bind(data.name, data.domain, token, data.ownerId)
         .run();
     return { siteId: Number(r.meta.last_row_id), token };
@@ -228,24 +175,14 @@ export async function createSite(
 
 export async function createSiteWithOwner(
     db: D1Database,
-    data: {
-        name: string;
-        domain: string;
-        ownerId: number;
-        brandColor?: string;
-        logoR2Key?: string;
-        fromEmail?: string;
-    }
+    data: { name: string; domain: string; ownerId: number; brandColor?: string; logoR2Key?: string; fromName?: string }
 ): Promise<{ siteId: number; token: string }> {
     const token = crypto.randomUUID().replace(/-/g, "");
     const r = await db
         .prepare(
-            "INSERT INTO sites (name, domain, token, owner_id, brand_color, logo_r2_key, from_email) VALUES (?, ?, ?, ?, ?, ?, ?)"
+            "INSERT INTO sites (name, domain, token, owner_id, brand_color, logo_r2_key, from_name) VALUES (?, ?, ?, ?, ?, ?, ?)"
         )
-        .bind(
-            data.name, data.domain, token, data.ownerId,
-            data.brandColor ?? null, data.logoR2Key ?? null, data.fromEmail ?? null
-        )
+        .bind(data.name, data.domain, token, data.ownerId, data.brandColor ?? null, data.logoR2Key ?? null, data.fromName ?? null)
         .run();
     return { siteId: Number(r.meta.last_row_id), token };
 }
@@ -253,27 +190,19 @@ export async function createSiteWithOwner(
 export async function updateSite(
     db: D1Database,
     id: number,
-    data: {
-        name: string;
-        domain: string;
-        brandColor?: string | null;
-        logoR2Key?: string | null;
-        fromEmail?: string | null;
-    }
+    data: { name: string; domain: string; brandColor?: string | null; logoR2Key?: string | null; fromName?: string | null }
 ): Promise<void> {
     const sets: string[] = ["name = ?", "domain = ?"];
     const vals: (string | number | null)[] = [data.name, data.domain];
     if (data.brandColor !== undefined) { sets.push("brand_color = ?"); vals.push(data.brandColor); }
     if (data.logoR2Key  !== undefined) { sets.push("logo_r2_key = ?");  vals.push(data.logoR2Key); }
-    if (data.fromEmail  !== undefined) { sets.push("from_email = ?");   vals.push(data.fromEmail); }
+    if (data.fromName   !== undefined) { sets.push("from_name = ?");    vals.push(data.fromName); }
     vals.push(id);
     await db.prepare(`UPDATE sites SET ${sets.join(", ")} WHERE id = ?`).bind(...vals).run();
 }
 
 export async function updateSiteBranding(
-    db: D1Database,
-    siteId: number,
-    data: { brandColor?: string; logoR2Key?: string }
+    db: D1Database, siteId: number, data: { brandColor?: string; logoR2Key?: string }
 ): Promise<void> {
     const sets: string[] = [];
     const vals: (string | number)[] = [];
@@ -290,14 +219,11 @@ export async function deleteSite(db: D1Database, id: number): Promise<void> {
 
 // ── Tickets ────────────────────────────────────────────────────────────────
 export async function getTickets(
-    db: D1Database,
-    filters?: { siteId?: number; status?: string }
+    db: D1Database, filters?: { siteId?: number; status?: string }
 ): Promise<Ticket[]> {
     let q = `
-        SELECT t.*, s.name AS site_name, s.from_email AS site_from_email
-        FROM tickets t
-        JOIN sites s ON t.site_id = s.id
-        WHERE 1=1
+        SELECT t.*, s.name AS site_name, s.from_name AS site_from_name
+        FROM tickets t JOIN sites s ON t.site_id = s.id WHERE 1=1
     `;
     const p: (string | number)[] = [];
     if (filters?.siteId) { q += " AND t.site_id = ?"; p.push(filters.siteId); }
@@ -307,46 +233,26 @@ export async function getTickets(
     return r.results;
 }
 
-export async function getTicketById(
-    db: D1Database,
-    id: number
-): Promise<Ticket | null> {
-    return db
-        .prepare(
-            `SELECT t.*, s.name AS site_name, s.from_email AS site_from_email
-             FROM tickets t
-             JOIN sites s ON t.site_id = s.id
-             WHERE t.id = ?`
-        )
-        .bind(id)
-        .first<Ticket>();
+export async function getTicketById(db: D1Database, id: number): Promise<Ticket | null> {
+    return db.prepare(
+        `SELECT t.*, s.name AS site_name, s.from_name AS site_from_name
+         FROM tickets t JOIN sites s ON t.site_id = s.id
+         WHERE t.id = ?`
+    ).bind(id).first<Ticket>();
 }
 
-export async function getTicketByPublicToken(
-    db: D1Database,
-    token: string
-): Promise<Ticket | null> {
-    return db
-        .prepare(
-            `SELECT t.*, s.name AS site_name, s.from_email AS site_from_email
-             FROM tickets t
-             JOIN sites s ON t.site_id = s.id
-             WHERE t.public_token = ?`
-        )
-        .bind(token)
-        .first<Ticket>();
+export async function getTicketByPublicToken(db: D1Database, token: string): Promise<Ticket | null> {
+    return db.prepare(
+        `SELECT t.*, s.name AS site_name, s.from_name AS site_from_name
+         FROM tickets t JOIN sites s ON t.site_id = s.id
+         WHERE t.public_token = ?`
+    ).bind(token).first<Ticket>();
 }
 
-export async function getTicketMessages(
-    db: D1Database,
-    ticketId: number
-): Promise<TicketMessage[]> {
+export async function getTicketMessages(db: D1Database, ticketId: number): Promise<TicketMessage[]> {
     const r = await db
-        .prepare(
-            "SELECT * FROM ticket_messages WHERE ticket_id = ? ORDER BY created_at ASC"
-        )
-        .bind(ticketId)
-        .all<TicketMessage>();
+        .prepare("SELECT * FROM ticket_messages WHERE ticket_id = ? ORDER BY created_at ASC")
+        .bind(ticketId).all<TicketMessage>();
     return r.results;
 }
 
@@ -355,35 +261,19 @@ export async function createTicketMessage(
     data: { ticketId: number; sender: "admin" | "client" | "owner"; message: string }
 ): Promise<number> {
     const r = await db
-        .prepare(
-            "INSERT INTO ticket_messages (ticket_id, sender, message) VALUES (?, ?, ?)"
-        )
+        .prepare("INSERT INTO ticket_messages (ticket_id, sender, message) VALUES (?, ?, ?)")
         .bind(data.ticketId, data.sender, data.message)
         .run();
     return Number(r.meta.last_row_id);
 }
 
-export async function updateTicketStatus(
-    db: D1Database,
-    ticketId: number,
-    status: string
-): Promise<void> {
-    await db
-        .prepare("UPDATE tickets SET status = ? WHERE id = ?")
-        .bind(status, ticketId)
-        .run();
+export async function updateTicketStatus(db: D1Database, ticketId: number, status: string): Promise<void> {
+    await db.prepare("UPDATE tickets SET status = ? WHERE id = ?").bind(status, ticketId).run();
 }
 
 export async function createTicket(
     db: D1Database,
-    data: {
-        siteId: number;
-        clientName: string;
-        clientEmail: string;
-        clientPhone?: string | null;
-        category: string;
-        description: string;
-    }
+    data: { siteId: number; clientName: string; clientEmail: string; clientPhone?: string | null; category: string; description: string }
 ): Promise<{ id: number; publicToken: string }> {
     const publicToken = crypto.randomUUID().replace(/-/g, "");
     const r = await db
@@ -391,44 +281,31 @@ export async function createTicket(
             `INSERT INTO tickets (site_id, client_name, client_email, client_phone, category, description, public_token)
              VALUES (?, ?, ?, ?, ?, ?, ?)`
         )
-        .bind(
-            data.siteId, data.clientName, data.clientEmail,
-            data.clientPhone ?? null, data.category, data.description, publicToken
-        )
+        .bind(data.siteId, data.clientName, data.clientEmail, data.clientPhone ?? null, data.category, data.description, publicToken)
         .run();
     return { id: Number(r.meta.last_row_id), publicToken };
 }
 
-export async function getTicketsBySiteIds(
-    db: D1Database,
-    siteIds: number[]
-): Promise<Ticket[]> {
+export async function getTicketsBySiteIds(db: D1Database, siteIds: number[]): Promise<Ticket[]> {
     if (siteIds.length === 0) return [];
     const placeholders = inClausePlaceholders(siteIds.length);
-    const r = await db
-        .prepare(
-            `SELECT t.*, s.name AS site_name, s.from_email AS site_from_email
-             FROM tickets t
-             JOIN sites s ON t.site_id = s.id
-             WHERE t.site_id IN (${placeholders})
-             ORDER BY t.created_at DESC`
-        )
-        .bind(...siteIds)
-        .all<Ticket>();
+    const r = await db.prepare(
+        `SELECT t.*, s.name AS site_name, s.from_name AS site_from_name
+         FROM tickets t JOIN sites s ON t.site_id = s.id
+         WHERE t.site_id IN (${placeholders})
+         ORDER BY t.created_at DESC`
+    ).bind(...siteIds).all<Ticket>();
     return r.results;
 }
 
 // ── Invoices ───────────────────────────────────────────────────────────────
 export async function getInvoices(
-    db: D1Database,
-    filters?: { siteId?: number; status?: string }
+    db: D1Database, filters?: { siteId?: number; status?: string }
 ): Promise<Invoice[]> {
     let q = `
         SELECT i.*, s.name AS site_name, u.name AS owner_name
-        FROM invoices i
-        JOIN sites s ON i.site_id = s.id
-        LEFT JOIN users u ON s.owner_id = u.id
-        WHERE 1=1
+        FROM invoices i JOIN sites s ON i.site_id = s.id
+        LEFT JOIN users u ON s.owner_id = u.id WHERE 1=1
     `;
     const p: (string | number)[] = [];
     if (filters?.siteId) { q += " AND i.site_id = ?"; p.push(filters.siteId); }
@@ -438,20 +315,13 @@ export async function getInvoices(
     return r.results;
 }
 
-export async function getInvoiceById(
-    db: D1Database,
-    id: number
-): Promise<Invoice | null> {
-    return db
-        .prepare(
-            `SELECT i.*, s.name AS site_name, u.name AS owner_name
-             FROM invoices i
-             JOIN sites s ON i.site_id = s.id
-             LEFT JOIN users u ON s.owner_id = u.id
-             WHERE i.id = ?`
-        )
-        .bind(id)
-        .first<Invoice>();
+export async function getInvoiceById(db: D1Database, id: number): Promise<Invoice | null> {
+    return db.prepare(
+        `SELECT i.*, s.name AS site_name, u.name AS owner_name
+         FROM invoices i JOIN sites s ON i.site_id = s.id
+         LEFT JOIN users u ON s.owner_id = u.id
+         WHERE i.id = ?`
+    ).bind(id).first<Invoice>();
 }
 
 export async function createInvoice(
@@ -459,122 +329,79 @@ export async function createInvoice(
     data: { siteId: number; description: string; amount: number; dueDate: string | null }
 ): Promise<number> {
     const r = await db
-        .prepare(
-            "INSERT INTO invoices (site_id, description, amount, due_date) VALUES (?, ?, ?, ?)"
-        )
+        .prepare("INSERT INTO invoices (site_id, description, amount, due_date) VALUES (?, ?, ?, ?)")
         .bind(data.siteId, data.description, data.amount, data.dueDate)
         .run();
     return Number(r.meta.last_row_id);
 }
 
 export async function updateInvoice(
-    db: D1Database,
-    id: number,
+    db: D1Database, id: number,
     data: { description: string; amount: number; dueDate: string | null; status: string }
 ): Promise<void> {
-    await db
-        .prepare(
-            `UPDATE invoices SET description = ?, amount = ?, due_date = ?, status = ? WHERE id = ?`
-        )
-        .bind(data.description, data.amount, data.dueDate, data.status, id)
-        .run();
+    await db.prepare(`UPDATE invoices SET description = ?, amount = ?, due_date = ?, status = ? WHERE id = ?`)
+        .bind(data.description, data.amount, data.dueDate, data.status, id).run();
 }
 
 export async function markInvoicePaid(db: D1Database, id: number): Promise<void> {
-    await db
-        .prepare("UPDATE invoices SET status = 'paid', paid_at = datetime('now') WHERE id = ?")
-        .bind(id)
-        .run();
+    await db.prepare("UPDATE invoices SET status = 'paid', paid_at = datetime('now') WHERE id = ?")
+        .bind(id).run();
 }
 
 export async function deleteInvoice(db: D1Database, id: number): Promise<void> {
     await db.prepare("DELETE FROM invoices WHERE id = ?").bind(id).run();
 }
 
-export async function getInvoicesBySiteIds(
-    db: D1Database,
-    siteIds: number[]
-): Promise<Invoice[]> {
+export async function getInvoicesBySiteIds(db: D1Database, siteIds: number[]): Promise<Invoice[]> {
     if (siteIds.length === 0) return [];
     const placeholders = inClausePlaceholders(siteIds.length);
-    const r = await db
-        .prepare(
-            `SELECT i.*, s.name AS site_name, u.name AS owner_name
-             FROM invoices i
-             JOIN sites s ON i.site_id = s.id
-             LEFT JOIN users u ON s.owner_id = u.id
-             WHERE i.site_id IN (${placeholders})
-             ORDER BY i.created_at DESC`
-        )
-        .bind(...siteIds)
-        .all<Invoice>();
+    const r = await db.prepare(
+        `SELECT i.*, s.name AS site_name, u.name AS owner_name
+         FROM invoices i JOIN sites s ON i.site_id = s.id
+         LEFT JOIN users u ON s.owner_id = u.id
+         WHERE i.site_id IN (${placeholders})
+         ORDER BY i.created_at DESC`
+    ).bind(...siteIds).all<Invoice>();
     return r.results;
 }
 
 // ── Attachments ────────────────────────────────────────────────────────────
 export async function getAttachments(
-    db: D1Database,
-    entityType: string,
-    entityId: number
+    db: D1Database, entityType: string, entityId: number
 ): Promise<Attachment[]> {
-    const r = await db
-        .prepare(
-            `SELECT * FROM attachments
-             WHERE entity_type = ? AND entity_id = ?
-             ORDER BY created_at ASC`
-        )
-        .bind(entityType, entityId)
-        .all<Attachment>();
+    const r = await db.prepare(
+        `SELECT * FROM attachments WHERE entity_type = ? AND entity_id = ? ORDER BY created_at ASC`
+    ).bind(entityType, entityId).all<Attachment>();
     return r.results;
 }
 
 export async function getAttachmentsByEntityIds(
-    db: D1Database,
-    entityType: string,
-    entityIds: number[]
+    db: D1Database, entityType: string, entityIds: number[]
 ): Promise<Attachment[]> {
     if (entityIds.length === 0) return [];
     const placeholders = inClausePlaceholders(entityIds.length);
-    const r = await db
-        .prepare(
-            `SELECT * FROM attachments
-             WHERE entity_type = ? AND entity_id IN (${placeholders})
-             ORDER BY created_at ASC`
-        )
-        .bind(entityType, ...entityIds)
-        .all<Attachment>();
+    const r = await db.prepare(
+        `SELECT * FROM attachments
+         WHERE entity_type = ? AND entity_id IN (${placeholders})
+         ORDER BY created_at ASC`
+    ).bind(entityType, ...entityIds).all<Attachment>();
     return r.results;
 }
 
 export async function createAttachment(
     db: D1Database,
-    data: {
-        entityType: string;
-        entityId: number;
-        fileName: string;
-        fileType: string;
-        fileSize: number;
-        r2Key: string;
-    }
+    data: { entityType: string; entityId: number; fileName: string; fileType: string; fileSize: number; r2Key: string }
 ): Promise<number> {
-    const r = await db
-        .prepare(
-            `INSERT INTO attachments (entity_type, entity_id, file_name, file_type, file_size, r2_key)
-             VALUES (?, ?, ?, ?, ?, ?)`
-        )
-        .bind(data.entityType, data.entityId, data.fileName, data.fileType, data.fileSize, data.r2Key)
-        .run();
+    const r = await db.prepare(
+        `INSERT INTO attachments (entity_type, entity_id, file_name, file_type, file_size, r2_key)
+         VALUES (?, ?, ?, ?, ?, ?)`
+    ).bind(data.entityType, data.entityId, data.fileName, data.fileType, data.fileSize, data.r2Key).run();
     return Number(r.meta.last_row_id);
 }
 
-export async function deleteAttachment(
-    db: D1Database,
-    id: number
-): Promise<string | null> {
-    const row = await db
-        .prepare("SELECT r2_key FROM attachments WHERE id = ?")
-        .bind(id)
-        .first<{ r2_key: string }>();
+export async function deleteAttachment(db: D1Database, id: number): Promise<string | null> {
+    const row = await db.prepare("SELECT r2_key FROM attachments WHERE id = ?")
+        .bind(id).first<{ r2_key: string }>();
     if (!row) return null;
     await db.prepare("DELETE FROM attachments WHERE id = ?").bind(id).run();
     return row.r2_key;

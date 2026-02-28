@@ -61,24 +61,18 @@ export async function action({ params, request, context }: Route.ActionArgs) {
         } catch (err) { console.error("[upload] erro:", err); }
     }
 
-    const fromEmail = site.from_email || env.FROM_EMAIL;
+    // FROM: "Nome do Site <email@verificado.pt>" ou apenas o email global
+    const from = site.from_name
+        ? `${site.from_name} <${env.FROM_EMAIL}>`
+        : env.FROM_EMAIL;
 
-    // ── Diagnóstico (pode ser removido após confirmar que os emails estão a ser enviados)
-    console.log("[email] RESEND_API_KEY configurado:", !!env.RESEND_API_KEY);
-    console.log("[email] FROM_EMAIL:", fromEmail || "NÃO DEFINIDO");
-    console.log("[email] ADMIN_EMAIL:", env.ADMIN_EMAIL || "NÃO DEFINIDO");
-
-    if (!env.RESEND_API_KEY) {
-        console.error("[email] RESEND_API_KEY não configurado — emails não enviados.");
-    } else {
+    if (env.RESEND_API_KEY) {
         try {
             await sendTicketConfirmation({
-                apiKey: env.RESEND_API_KEY,
-                from:   fromEmail,
+                apiKey: env.RESEND_API_KEY, from,
                 to: clientEmail, clientName, ticketId: id, category, description, publicToken,
                 baseUrl: env.BASE_URL,
             });
-            console.log("[email] confirmação ao cliente enviada.");
         } catch (err) {
             console.error("[email] erro ao enviar confirmação ao cliente:", err);
         }
@@ -86,14 +80,11 @@ export async function action({ params, request, context }: Route.ActionArgs) {
         if (env.ADMIN_EMAIL) {
             try {
                 await sendAdminNotification({
-                    apiKey:      env.RESEND_API_KEY,
-                    from:        fromEmail,
-                    adminEmail:  env.ADMIN_EMAIL,
+                    apiKey: env.RESEND_API_KEY, from,
+                    adminEmail: env.ADMIN_EMAIL,
                     clientName, ticketId: id, message: description,
-                    baseUrl:     env.BASE_URL,
-                    isNewTicket: true, category,
+                    baseUrl: env.BASE_URL, isNewTicket: true, category,
                 });
-                console.log("[email] notificação ao admin enviada.");
             } catch (err) {
                 console.error("[email] erro ao notificar admin:", err);
             }
