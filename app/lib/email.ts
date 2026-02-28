@@ -2,30 +2,29 @@ import { Resend } from "resend";
 
 const style = `font-family:'Inter',-apple-system,sans-serif;max-width:560px;margin:0 auto;color:#111827;`;
 
-/**
- * Constrói o endereço reply-to para inbound.
- * Padrão: ticket-{id}@tiagoanoliveira.pt
- * O Cloudflare Email Routing encaminha este endereço para o Worker,
- * que o processa como resposta ao ticket.
- */
-const replyAddress = (ticketId: number, inboundDomain = "tiagoanoliveira.pt") =>
-  `ticket-${ticketId}@${inboundDomain}`;
-
 // ── Confirmação ao cliente quando submete ticket ──────────────────────────
+//
+// `from`    = email do site (ex: suporte@garoorexia.pt) ou FROM_EMAIL global
+// `replyTo` = igual ao `from`; se o cliente responder por email, vai para
+//             a caixa de entrada real do site (não é processado automaticamente)
 
 export async function sendTicketConfirmation(params: {
-  apiKey: string; from: string;
-  to: string; clientName: string;
-  ticketId: number; category: string;
-  description: string; publicToken: string; baseUrl: string;
-  inboundDomain?: string;
+  apiKey: string;
+  from: string;
+  to: string;
+  clientName: string;
+  ticketId: number;
+  category: string;
+  description: string;
+  publicToken: string;
+  baseUrl: string;
 }) {
   const resend = new Resend(params.apiKey);
   const url    = `${params.baseUrl}/ticket/${params.publicToken}`;
   return resend.emails.send({
     from:    params.from,
     to:      params.to,
-    replyTo: replyAddress(params.ticketId, params.inboundDomain),
+    replyTo: params.from, // respostas vão para a caixa real do site
     subject: `[Suporte #${params.ticketId}] Pedido recebido — ${params.category}`,
     html: `
     <div style="${style}">
@@ -34,16 +33,21 @@ export async function sendTicketConfirmation(params: {
       </div>
       <div style="background:#f9fafb;padding:32px;border-radius:0 0 12px 12px;border:1px solid #e5e7eb;border-top:none;">
         <p style="margin:0 0 16px;">Olá <strong>${params.clientName}</strong>,</p>
-        <p style="margin:0 0 24px;color:#6b7280;">Recebemos o teu pedido de suporte. Entraremos em contacto brevemente.</p>
+        <p style="margin:0 0 24px;color:#6b7280;">
+          Recebemos o teu pedido de suporte. Entraremos em contacto brevemente.
+        </p>
         <div style="background:white;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:24px;">
-          <p style="margin:0 0 6px;font-size:12px;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;">TICKET #${params.ticketId} · ${params.category}</p>
+          <p style="margin:0 0 6px;font-size:12px;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;">
+            TICKET #${params.ticketId} · ${params.category}
+          </p>
           <p style="margin:0;color:#6b7280;font-size:14px;">${params.description}</p>
         </div>
-        <a href="${url}" style="display:inline-block;background:#2563eb;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">
+        <a href="${url}"
+           style="display:inline-block;background:#2563eb;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">
           Acompanhar Ticket
         </a>
         <p style="margin:24px 0 0;font-size:12px;color:#9ca3af;">
-          Podes também responder diretamente a este email para adicionar informações ao teu pedido.
+          Para responder ou adicionar informações ao teu pedido, usa o botão acima.
         </p>
       </div>
     </div>`,
@@ -53,18 +57,22 @@ export async function sendTicketConfirmation(params: {
 // ── Resposta do admin ao cliente ──────────────────────────────────────────
 
 export async function sendAdminReply(params: {
-  apiKey: string; from: string;
-  to: string; clientName: string;
-  ticketId: number; category: string;
-  message: string; publicToken: string; baseUrl: string;
-  inboundDomain?: string;
+  apiKey: string;
+  from: string;
+  to: string;
+  clientName: string;
+  ticketId: number;
+  category: string;
+  message: string;
+  publicToken: string;
+  baseUrl: string;
 }) {
   const resend = new Resend(params.apiKey);
   const url    = `${params.baseUrl}/ticket/${params.publicToken}`;
   return resend.emails.send({
     from:    params.from,
     to:      params.to,
-    replyTo: replyAddress(params.ticketId, params.inboundDomain),
+    replyTo: params.from,
     subject: `[Suporte #${params.ticketId}] Nova resposta — ${params.category}`,
     html: `
     <div style="${style}">
@@ -73,27 +81,34 @@ export async function sendAdminReply(params: {
       </div>
       <div style="background:#f9fafb;padding:32px;border-radius:0 0 12px 12px;border:1px solid #e5e7eb;border-top:none;">
         <p style="margin:0 0 16px;">Olá <strong>${params.clientName}</strong>,</p>
-        <p style="margin:0 0 20px;color:#6b7280;">Tens uma nova resposta ao ticket <strong>#${params.ticketId}</strong>:</p>
+        <p style="margin:0 0 20px;color:#6b7280;">
+          Tens uma nova resposta ao ticket <strong>#${params.ticketId}</strong>:
+        </p>
         <div style="background:white;border-left:3px solid #2563eb;padding:16px;margin-bottom:24px;border-radius:0 8px 8px 0;">
           <p style="margin:0;line-height:1.7;">${params.message.replace(/\n/g, "<br>")}</p>
         </div>
-        <a href="${url}" style="display:inline-block;background:#2563eb;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">
+        <a href="${url}"
+           style="display:inline-block;background:#2563eb;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">
           Ver Ticket &amp; Responder
         </a>
         <p style="margin:24px 0 0;font-size:12px;color:#9ca3af;">
-          Podes responder diretamente a este email ou usar o botão acima.
+          Para responder, usa o botão acima — não respondas diretamente a este email.
         </p>
       </div>
     </div>`,
   });
 }
 
-// ── Notificação ao admin (novo ticket ou resposta do cliente) ────────────
+// ── Notificação ao admin (novo ticket ou resposta do cliente via site) ──────
 
 export async function sendAdminNotification(params: {
-  apiKey: string; from: string; adminEmail: string;
-  clientName: string; ticketId: number;
-  message: string; baseUrl: string;
+  apiKey: string;
+  from: string;
+  adminEmail: string;
+  clientName: string;
+  ticketId: number;
+  message: string;
+  baseUrl: string;
   isNewTicket?: boolean;
   category?: string;
 }) {
@@ -103,10 +118,12 @@ export async function sendAdminNotification(params: {
   const subject = isNew
     ? `[Novo Ticket #${params.ticketId}] ${params.category ?? ""} — ${params.clientName}`
     : `[Ticket #${params.ticketId}] Nova resposta de ${params.clientName}`;
-  const heading = isNew ? `Novo Ticket #${params.ticketId} Aberto` : `Resposta no Ticket #${params.ticketId}`;
-  const intro   = isNew
-    ? `<strong>${params.clientName}</strong> abriu um novo pedido de suporte${params.category ? ` — <strong>${params.category}</strong>` : ""}:`
-    : `<strong>${params.clientName}</strong> respondeu:`;
+  const heading = isNew
+    ? `Novo Ticket #${params.ticketId} Aberto`
+    : `Resposta no Ticket #${params.ticketId}`;
+  const intro = isNew
+    ? `<strong>${params.clientName}</strong> abriu um novo pedido${params.category ? ` — <strong>${params.category}</strong>` : ""}:`
+    : `<strong>${params.clientName}</strong> respondeu via página de suporte:`;
 
   return resend.emails.send({
     from:    params.from,
@@ -122,7 +139,8 @@ export async function sendAdminNotification(params: {
         <div style="background:white;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:20px;">
           <p style="margin:0;line-height:1.7;">${params.message.replace(/\n/g, "<br>")}</p>
         </div>
-        <a href="${url}" style="display:inline-block;background:#111827;color:white;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">
+        <a href="${url}"
+           style="display:inline-block;background:#111827;color:white;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">
           Ver no Painel Admin
         </a>
       </div>
@@ -133,9 +151,12 @@ export async function sendAdminNotification(params: {
 // ── Password reset ────────────────────────────────────────────────────────
 
 export async function sendPasswordReset(params: {
-  apiKey: string; from: string;
-  to: string; clientName: string;
-  resetToken: string; baseUrl: string;
+  apiKey: string;
+  from: string;
+  to: string;
+  clientName: string;
+  resetToken: string;
+  baseUrl: string;
 }) {
   const resend = new Resend(params.apiKey);
   const url    = `${params.baseUrl}/portal/reset-password?token=${params.resetToken}`;
@@ -150,7 +171,8 @@ export async function sendPasswordReset(params: {
       <div style="background:#f9fafb;padding:32px;border-radius:0 0 12px 12px;border:1px solid #e5e7eb;border-top:none;">
         <p style="margin:0 0 16px;">Olá <strong>${params.clientName}</strong>,</p>
         <p style="margin:0 0 24px;color:#6b7280;">Foi solicitada a redefinição da tua password. O link é válido por 2 horas.</p>
-        <a href="${url}" style="display:inline-block;background:#2563eb;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">
+        <a href="${url}"
+           style="display:inline-block;background:#2563eb;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">
           Redefinir Password
         </a>
         <p style="margin:24px 0 0;font-size:12px;color:#9ca3af;">Se não solicitaste isto, ignora este email.</p>
@@ -162,9 +184,12 @@ export async function sendPasswordReset(params: {
 // ── Boas-vindas ao portal ─────────────────────────────────────────────────
 
 export async function sendWelcome(params: {
-  apiKey: string; from: string;
-  to: string; clientName: string;
-  password: string; baseUrl: string;
+  apiKey: string;
+  from: string;
+  to: string;
+  clientName: string;
+  password: string;
+  baseUrl: string;
 }) {
   const resend = new Resend(params.apiKey);
   return resend.emails.send({
@@ -176,12 +201,13 @@ export async function sendWelcome(params: {
         <h1 style="color:white;margin:0;font-size:20px;">Bem-vindo, ${params.clientName}!</h1>
       </div>
       <div style="background:#f9fafb;padding:32px;border-radius:0 0 12px 12px;border:1px solid #e5e7eb;border-top:none;">
-        <p style="margin:0 0 16px;">Criámos o teu acesso ao portal de cliente. Aqui ficam as tuas credenciais:</p>
+        <p style="margin:0 0 16px;">Criámos o teu acesso ao portal de cliente:</p>
         <div style="background:white;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:24px;">
           <p style="margin:0 0 8px;font-size:13px;"><strong>Email:</strong> ${params.to}</p>
           <p style="margin:0;font-size:13px;"><strong>Password:</strong> ${params.password}</p>
         </div>
-        <a href="${params.baseUrl}/portal" style="display:inline-block;background:#2563eb;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">
+        <a href="${params.baseUrl}/portal"
+           style="display:inline-block;background:#2563eb;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">
           Aceder ao Portal
         </a>
         <p style="margin:24px 0 0;font-size:12px;color:#9ca3af;">Recomendamos que alteres a password após o primeiro acesso.</p>

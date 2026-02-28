@@ -73,18 +73,19 @@ export async function action({ request, params, context }: Route.ActionArgs) {
         if (!env.RESEND_API_KEY) {
             console.warn("⚠️  RESEND_API_KEY não configurado — email não enviado.");
         } else if (ticket) {
+            // Usa o email do site se configurado; caso contrário usa o global FROM_EMAIL
+            const fromEmail = ticket.site_from_email || env.FROM_EMAIL;
             try {
                 await sendAdminReply({
-                    apiKey:       env.RESEND_API_KEY,
-                    from:         env.FROM_EMAIL,
-                    to:           ticket.client_email,
-                    clientName:   ticket.client_name,
-                    ticketId:     id,
-                    category:     ticket.category,
+                    apiKey:      env.RESEND_API_KEY,
+                    from:        fromEmail,
+                    to:          ticket.client_email,
+                    clientName:  ticket.client_name,
+                    ticketId:    id,
+                    category:    ticket.category,
                     message,
-                    publicToken:  ticket.public_token,
-                    baseUrl:      env.BASE_URL,
-                    inboundDomain: env.INBOUND_EMAIL_DOMAIN,
+                    publicToken: ticket.public_token,
+                    baseUrl:     env.BASE_URL,
                 });
             } catch (err) {
                 console.error("❌ Erro ao enviar email:", err);
@@ -124,7 +125,6 @@ export default function AdminTicketDetail() {
 
     return (
         <div className="max-w-3xl">
-            {/* Header */}
             <div className="flex items-start justify-between mb-8">
                 <div>
                     <div className="flex items-center gap-3 mb-1">
@@ -151,7 +151,6 @@ export default function AdminTicketDetail() {
                 </div>
             </div>
 
-            {/* Info do cliente */}
             <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 mb-6 text-sm">
                 <div className="grid grid-cols-2 gap-4 mb-4">
                     <div>
@@ -164,43 +163,24 @@ export default function AdminTicketDetail() {
                     </div>
                     <div className="col-span-2">
                         <p className="text-xs text-gray-400 mb-1">Descrição inicial</p>
-                        <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
-                            {ticket.description}
-                        </p>
+                        <p className="text-gray-700 dark:text-gray-300 leading-relaxed">{ticket.description}</p>
                     </div>
                 </div>
-                <Attachments
-                    attachments={ticketAttachments}
-                    entityType="ticket"
-                    entityId={ticket.id}
-                    canDelete
-                />
+                <Attachments attachments={ticketAttachments} entityType="ticket" entityId={ticket.id} canDelete />
             </div>
 
-            {/* Thread de mensagens */}
             {messages.length > 0 && (
                 <div className="space-y-4 mb-6">
-                    <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
-                        Histórico
-                    </h2>
+                    <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Histórico</h2>
                     {messages.map((msg, i) => (
-                        <div
-                            key={msg.id}
-                            className={`flex ${msg.sender === "admin" ? "justify-end" : "justify-start"}`}
-                        >
-                            <div
-                                className={`max-w-[80%] rounded-2xl px-5 py-3.5 text-sm ${
-                                    msg.sender === "admin"
-                                        ? "bg-blue-600 text-white rounded-tr-sm"
-                                        : "bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-tl-sm"
-                                }`}
-                            >
+                        <div key={msg.id} className={`flex ${msg.sender === "admin" ? "justify-end" : "justify-start"}`}>
+                            <div className={`max-w-[80%] rounded-2xl px-5 py-3.5 text-sm ${
+                                msg.sender === "admin"
+                                    ? "bg-blue-600 text-white rounded-tr-sm"
+                                    : "bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-tl-sm"
+                            }`}>
                                 <p className="leading-relaxed whitespace-pre-wrap">{msg.message}</p>
-                                <p
-                                    className={`text-xs mt-1.5 ${
-                                        msg.sender === "admin" ? "text-blue-200" : "text-gray-400"
-                                    }`}
-                                >
+                                <p className={`text-xs mt-1.5 ${msg.sender === "admin" ? "text-blue-200" : "text-gray-400"}`}>
                                     {msg.sender === "admin" ? "Tu" : ticket.client_name} ·{" "}
                                     {new Date(msg.created_at).toLocaleString("pt-PT")}
                                 </p>
@@ -220,13 +200,9 @@ export default function AdminTicketDetail() {
                 </div>
             )}
 
-            {/* Formulário de resposta */}
             {ticket.status !== "closed" ? (
-                <Form
-                    method="post"
-                    encType="multipart/form-data"
-                    className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5"
-                >
+                <Form method="post" encType="multipart/form-data"
+                    className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5">
                     <input type="hidden" name="intent" value="reply" />
                     <h2 className="font-semibold mb-3">Responder</h2>
 
@@ -236,50 +212,27 @@ export default function AdminTicketDetail() {
                         </p>
                     )}
 
-                    <textarea
-                        name="message"
-                        rows={4}
-                        placeholder="Escreve a tua resposta…"
-                        required
-                        className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3"
-                    />
+                    <textarea name="message" rows={4} placeholder="Escreve a tua resposta…" required
+                        className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3" />
 
                     <div className="mb-4">
                         <label className="flex items-center gap-1.5 text-xs font-medium text-gray-500 mb-1.5">
-                            <Paperclip size={12} />
-                            Anexos (opcional)
+                            <Paperclip size={12} /> Anexos (opcional)
                         </label>
-                        <input
-                            type="file"
-                            name="files"
-                            multiple
-                            accept=".pdf,.jpg,.jpeg,.png,.gif,.webp"
-                            className="text-sm text-gray-500
-                file:mr-3 file:py-1.5 file:px-3
-                file:rounded-lg file:border-0
-                file:text-xs file:font-medium
-                file:bg-blue-50 file:text-blue-700
-                hover:file:bg-blue-100
-                dark:file:bg-blue-950 dark:file:text-blue-300"
-                        />
-                        <p className="text-xs text-gray-400 mt-1">
-                            PDF, JPG, PNG, WebP — máx. 10 MB por ficheiro
-                        </p>
+                        <input type="file" name="files" multiple accept=".pdf,.jpg,.jpeg,.png,.gif,.webp"
+                            className="text-sm text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-blue-950 dark:file:text-blue-300" />
+                        <p className="text-xs text-gray-400 mt-1">PDF, JPG, PNG, WebP — máx. 10 MB por ficheiro</p>
                     </div>
 
                     <div className="flex justify-end">
-                        <button
-                            type="submit"
-                            className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
-                        >
+                        <button type="submit"
+                            className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors">
                             Enviar resposta
                         </button>
                     </div>
                 </Form>
             ) : (
-                <p className="text-sm text-center text-gray-400 py-4">
-                    Este ticket está fechado.
-                </p>
+                <p className="text-sm text-center text-gray-400 py-4">Este ticket está fechado.</p>
             )}
         </div>
     );

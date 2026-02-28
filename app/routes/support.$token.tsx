@@ -61,17 +61,26 @@ export async function action({ params, request, context }: Route.ActionArgs) {
         } catch (err) { console.error("Erro ao fazer upload de anexo:", err); }
     }
 
+    // Email de remetente: usa o email configurado no site ou o global
+    const fromEmail = site.from_email || env.FROM_EMAIL;
+
     if (env.RESEND_API_KEY) {
         await sendTicketConfirmation({
-            apiKey: env.RESEND_API_KEY, from: env.FROM_EMAIL,
-            to: clientEmail, clientName, ticketId: id, category, description, publicToken, baseUrl: env.BASE_URL,
+            apiKey: env.RESEND_API_KEY,
+            from:   fromEmail,
+            to: clientEmail, clientName, ticketId: id, category, description, publicToken,
+            baseUrl: env.BASE_URL,
         }).catch(console.error);
     }
 
     if (env.RESEND_API_KEY && env.ADMIN_EMAIL) {
         await sendAdminNotification({
-            apiKey: env.RESEND_API_KEY, from: env.FROM_EMAIL, adminEmail: env.ADMIN_EMAIL,
-            clientName, ticketId: id, message: description, baseUrl: env.BASE_URL, isNewTicket: true, category,
+            apiKey:      env.RESEND_API_KEY,
+            from:        fromEmail,
+            adminEmail:  env.ADMIN_EMAIL,
+            clientName, ticketId: id, message: description,
+            baseUrl:     env.BASE_URL,
+            isNewTicket: true, category,
         }).catch(console.error);
     }
 
@@ -121,7 +130,6 @@ export default function SupportForm() {
                 <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 py-6 px-4 shadow-sm">
                     <Form method="post" encType="multipart/form-data" className="space-y-4">
 
-                        {/* Nome + Telefone */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-sm font-medium mb-1.5">Nome <span className="text-red-500">*</span></label>
@@ -137,7 +145,6 @@ export default function SupportForm() {
                             </div>
                         </div>
 
-                        {/* Email */}
                         <div>
                             <label className="block text-sm font-medium mb-1.5">Email <span className="text-red-500">*</span></label>
                             <input name="clientEmail" type="email" autoComplete="email" placeholder="teu@email.com"
@@ -146,7 +153,6 @@ export default function SupportForm() {
                             {errors.clientEmail && <p className="text-xs text-red-500 mt-1">{errors.clientEmail}</p>}
                         </div>
 
-                        {/* Categoria */}
                         <div>
                             <label className="block text-sm font-medium mb-1.5">Categoria <span className="text-red-500">*</span></label>
                             <select name="category"
@@ -158,7 +164,6 @@ export default function SupportForm() {
                             {errors.category && <p className="text-xs text-red-500 mt-1">{errors.category}</p>}
                         </div>
 
-                        {/* Descrição */}
                         <div>
                             <label className="block text-sm font-medium mb-1.5">Descrição do problema <span className="text-red-500">*</span></label>
                             <textarea name="description" rows={4}
@@ -168,7 +173,6 @@ export default function SupportForm() {
                             {errors.description && <p className="text-xs text-red-500 mt-1">{errors.description}</p>}
                         </div>
 
-                        {/* Anexos */}
                         <div>
                             <label className="flex items-center gap-1.5 text-sm font-medium mb-1.5">
                                 <Paperclip size={13} /> Anexos <span className="text-gray-400 font-normal">(opcional)</span>
@@ -185,7 +189,7 @@ export default function SupportForm() {
                         </button>
 
                         <p className="text-xs text-center text-gray-400">
-                            Receberás um email de confirmação com o link para acompanhar o teu pedido.
+                            Receberás um email de confirmação com o link para acompanhar e responder ao teu pedido.
                         </p>
                     </Form>
                 </div>
