@@ -2,6 +2,12 @@ import { Resend } from "resend";
 
 const style = `font-family:'Inter',-apple-system,sans-serif;max-width:560px;margin:0 auto;color:#111827;`;
 
+// Subdomínio de inbound: reply.tiagoanoliveira.pt
+// O ticket ID fica codificado no local-part para que o webhook saiba a que ticket pertence.
+// MX record: subdomínio reply.tiagoanoliveira.pt → Resend Inbound (não afeta Google MX no domínio principal)
+const INBOUND_DOMAIN = "reply.tiagoanoliveira.pt";
+const replyAddress = (ticketId: number) => `ticket-${ticketId}@${INBOUND_DOMAIN}`;
+
 // ── Confirmação ao cliente quando submete ticket ──────────────
 
 export async function sendTicketConfirmation(params: {
@@ -12,14 +18,10 @@ export async function sendTicketConfirmation(params: {
 }) {
     const resend = new Resend(params.apiKey);
     const url = `${params.baseUrl}/ticket/${params.publicToken}`;
-    // O reply-to aponta para o endereço de inbound com o ID do ticket no assunto
-    // Para que quando o cliente responda ao email, o worker de email inbound
-    // consiga identificar o ticket através do "#<id>" no assunto
-    const replySubjectHint = `support+ticket${params.ticketId}@tiagoanoliveira.pt`;
     return resend.emails.send({
         from:    params.from,
         to:      params.to,
-        replyTo: replySubjectHint,
+        replyTo: replyAddress(params.ticketId),
         subject: `[Suporte #${params.ticketId}] Pedido recebido — ${params.category}`,
         html: `
       <div style="${style}">
@@ -54,13 +56,10 @@ export async function sendAdminReply(params: {
 }) {
     const resend = new Resend(params.apiKey);
     const url = `${params.baseUrl}/ticket/${params.publicToken}`;
-    // Reply-to: endereço de inbound para que a resposta do cliente
-    // chegue ao worker com o ID do ticket preservado no assunto
-    const replyTo = `support+ticket${params.ticketId}@tiagoanoliveira.pt`;
     return resend.emails.send({
         from:    params.from,
         to:      params.to,
-        replyTo: replyTo,
+        replyTo: replyAddress(params.ticketId),
         subject: `[Suporte #${params.ticketId}] Nova resposta — ${params.category}`,
         html: `
       <div style="${style}">
