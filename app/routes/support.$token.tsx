@@ -25,8 +25,8 @@ export async function loader({ params, context }: Route.LoaderArgs) {
 }
 
 export async function action({ params, request, context }: Route.ActionArgs) {
-    const db   = context.cloudflare.env.DB;
-    const env  = context.cloudflare.env;
+    const env  = context.cloudflare.env as unknown as Env;
+    const db   = env.DB;
     const site = await getSiteByToken(db, params.token);
     if (!site) throw data("Site não encontrado", { status: 404 });
 
@@ -58,30 +58,46 @@ export async function action({ params, request, context }: Route.ActionArgs) {
                 entityType: "ticket", entityId: id,
                 fileName: file.name, fileType: file.type, fileSize: file.size, r2Key: key,
             });
-        } catch (err) { console.error("Erro ao fazer upload de anexo:", err); }
+        } catch (err) { console.error("[upload] erro:", err); }
     }
 
-    // Email de remetente: usa o email configurado no site ou o global
     const fromEmail = site.from_email || env.FROM_EMAIL;
 
-    if (env.RESEND_API_KEY) {
-        await sendTicketConfirmation({
-            apiKey: env.RESEND_API_KEY,
-            from:   fromEmail,
-            to: clientEmail, clientName, ticketId: id, category, description, publicToken,
-            baseUrl: env.BASE_URL,
-        }).catch(console.error);
-    }
+    // ── Diagnóstico (pode ser removido após confirmar que os emails estão a ser enviados)
+    console.log("[email] RESEND_API_KEY configurado:", !!env.RESEND_API_KEY);
+    console.log("[email] FROM_EMAIL:", fromEmail || "NÃO DEFINIDO");
+    console.log("[email] ADMIN_EMAIL:", env.ADMIN_EMAIL || "NÃO DEFINIDO");
 
-    if (env.RESEND_API_KEY && env.ADMIN_EMAIL) {
-        await sendAdminNotification({
-            apiKey:      env.RESEND_API_KEY,
-            from:        fromEmail,
-            adminEmail:  env.ADMIN_EMAIL,
-            clientName, ticketId: id, message: description,
-            baseUrl:     env.BASE_URL,
-            isNewTicket: true, category,
-        }).catch(console.error);
+    if (!env.RESEND_API_KEY) {
+        console.error("[email] RESEND_API_KEY não configurado — emails não enviados.");
+    } else {
+        try {
+            await sendTicketConfirmation({
+                apiKey: env.RESEND_API_KEY,
+                from:   fromEmail,
+                to: clientEmail, clientName, ticketId: id, category, description, publicToken,
+                baseUrl: env.BASE_URL,
+            });
+            console.log("[email] confirmação ao cliente enviada.");
+        } catch (err) {
+            console.error("[email] erro ao enviar confirmação ao cliente:", err);
+        }
+
+        if (env.ADMIN_EMAIL) {
+            try {
+                await sendAdminNotification({
+                    apiKey:      env.RESEND_API_KEY,
+                    from:        fromEmail,
+                    adminEmail:  env.ADMIN_EMAIL,
+                    clientName, ticketId: id, message: description,
+                    baseUrl:     env.BASE_URL,
+                    isNewTicket: true, category,
+                });
+                console.log("[email] notificação ao admin enviada.");
+            } catch (err) {
+                console.error("[email] erro ao notificar admin:", err);
+            }
+        }
     }
 
     return redirect(`/support/${params.token}/success?ticket=${id}`);
