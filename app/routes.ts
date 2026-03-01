@@ -4,6 +4,8 @@ export default [
     // Zona pública
     layout("routes/_public.tsx", [
         index("routes/home.tsx"),
+        route("projects",       "routes/projects._index.tsx"),
+        route("projects/:slug", "routes/projects.$slug.tsx"),
     ]),
 
     // Suporte público

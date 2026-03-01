@@ -1,25 +1,30 @@
 // app/routes/home.tsx
 import { motion, AnimatePresence } from "motion/react";
-import type { MetaFunction } from "react-router";
+import {type MetaFunction, useLoaderData} from "react-router";
 import { Link } from "react-router";
 import AnimatedSection from "~/components/ui/AnimatedSection";
 import CounterStat from "~/components/ui/CounterStat";
 import ScrollProgressBar from "~/components/ui/ScrollProgressBar";
 import { useState } from "react";
 import { Menu, X, User } from "lucide-react";
+import type { Route } from "./+types/home";
+import { getPublishedProjects } from "~/lib/projects.server";
 
 export const meta: MetaFunction = () => [
   { title: "Tiago Oliveira" },
   { name: "description", content: "Desenvolvimento de websites, softwares, manutenção de sistemas e suporte técnico para empresas e particulares." },
-  // Garante que o viewport é sempre 100% da largura do dispositivo
   { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
 ];
 
-const projects = [
-  { name: "Barbearia Brooklyn", url: "#", desc: "Website para barbearia com sistema de reservas online", tag: "Web" },
-  { name: "Projeto 2", url: "#", desc: "Descrição do projeto", tag: "Web" },
-  { name: "Projeto 3", url: "#", desc: "Descrição do projeto", tag: "Sistema" },
-];
+export async function loader({ context }: Route.LoaderArgs) {
+  const db = context.cloudflare.env.DB;
+  const projects = await getPublishedProjects(db, {
+    sortBy: "order_index",
+    sortDir: "asc",
+    limit: 2,
+  });
+  return { projects };
+}
 
 const stats = [
   { value: "2+", label: "Anos de experiência" },
@@ -38,6 +43,7 @@ const navLinks = [
 
 export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const { projects } = useLoaderData<typeof loader>();
 
   return (
       // overflow-x-hidden no wrapper raiz elimina o scroll horizontal em mobile
@@ -277,39 +283,58 @@ export default function Home() {
         <section id="portfolio" className="py-14 px-4 bg-gray-50 dark:bg-gray-900/50">
           <div className="max-w-6xl mx-auto">
             <AnimatedSection>
-              <p className="text-sm font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-3">Portófolio</p>
-              <h2 className="text-4xl font-bold mb-16">Projetos recentes</h2>
+              <div className="flex items-end justify-between mb-16">
+                <div>
+                  <p className="text-sm font-semibold text-blue-600 uppercase tracking-widest mb-3">Portófolio</p>
+                  <h2 className="text-4xl font-bold">Projetos recentes</h2>
+                </div>
+                <Link
+                    to="/projects"
+                    className="hidden sm:inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
+                >
+                  Ver todos <span>→</span>
+                </Link>
+              </div>
             </AnimatedSection>
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid md:grid-cols-2 gap-6">
               {projects.map((project, i) => (
-                  <AnimatedSection key={project.name} delay={i * 0.1}>
-                    <motion.a
-                        href={project.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        whileHover={{ y: -6, boxShadow: "0 20px 40px rgba(0,0,0,0.1)" }}
-                        transition={{ duration: 0.25 }}
-                        className="group block p-6 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl cursor-pointer"
-                    >
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="w-11 h-11 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-blue-500/30">
-                          {project.name[0]}
+                  <AnimatedSection key={project.slug} delay={i * 0.1}>
+                    <Link to={`/projects/${project.slug}`}>
+                      <motion.div
+                          whileHover={{ y: -6, boxShadow: "0 20px 40px rgba(0,0,0,0.1)" }}
+                          className="group block p-6 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl cursor-pointer"
+                      >
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="w-11 h-11 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center text-white font-bold text-lg">
+                            {project.title[0]}
+                          </div>
+                          <span className="text-xs font-medium text-blue-600 bg-blue-50 dark:bg-blue-950 px-3 py-1 rounded-full">
+                  {project.category}
+                </span>
                         </div>
-                        <span className="text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950 px-3 py-1 rounded-full">
-                          {project.tag}
-                        </span>
-                      </div>
-                      <h3 className="font-semibold text-lg mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                        {project.name}
-                      </h3>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">{project.desc}</p>
-                      <div className="mt-4 flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-                        Ver projeto
-                        <span className="group-hover:translate-x-1 transition-transform inline-block">→</span>
-                      </div>
-                    </motion.a>
+                        <h3 className="font-semibold text-lg mb-2 group-hover:text-blue-600 transition-colors">
+                          {project.title}
+                        </h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">{project.summary}</p>
+                        {project.complexity && (
+                            <div className="mt-3 flex gap-1">
+                              {Array.from({ length: 5 }).map((_, j) => (
+                                  <div
+                                      key={j}
+                                      className={`h-1.5 w-5 rounded-full ${j < project.complexity ? "bg-blue-500" : "bg-gray-200 dark:bg-gray-700"}`}
+                                  />
+                              ))}
+                            </div>
+                        )}
+                      </motion.div>
+                    </Link>
                   </AnimatedSection>
               ))}
+            </div>
+            <div className="mt-8 text-center sm:hidden">
+              <Link to="/projects" className="text-sm font-medium text-blue-600 hover:underline">
+                Ver todos os projetos →
+              </Link>
             </div>
           </div>
         </section>

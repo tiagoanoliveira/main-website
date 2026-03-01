@@ -73,6 +73,35 @@ CREATE TABLE IF NOT EXISTS attachments (
     created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+-- ── Projetos ───────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS projects (
+                                        id               INTEGER  PRIMARY KEY AUTOINCREMENT,
+                                        slug             TEXT     NOT NULL UNIQUE,          -- URL amigável (ex: "barbearia-brooklyn")
+                                        title            TEXT     NOT NULL,
+                                        category         TEXT     NOT NULL,
+                                        order_index      INTEGER  NOT NULL DEFAULT 0,       -- índice para ordenação "mais relevante"
+                                        summary          TEXT     NOT NULL,                 -- texto curto (cards e listagem)
+                                        description      TEXT     NOT NULL DEFAULT '',      -- descrição completa (página de detalhe)
+                                        link             TEXT     DEFAULT NULL,             -- URL externo, se existir
+                                        cover_image_key  TEXT     DEFAULT NULL,             -- R2 key imagem de capa
+                                        image_1_key      TEXT     DEFAULT NULL,             -- R2 key imagem extra 1
+                                        image_2_key      TEXT     DEFAULT NULL,
+                                        image_3_key      TEXT     DEFAULT NULL,
+                                        tags             TEXT     NOT NULL DEFAULT '[]',    -- JSON array ex: '["React","D1"]'
+                                        completed_at     DATE     DEFAULT NULL,
+                                        complexity       INTEGER  NOT NULL DEFAULT 1
+                                        CHECK(complexity BETWEEN 1 AND 5),
+    is_published     INTEGER  NOT NULL DEFAULT 1,
+    created_at       DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at       DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+CREATE INDEX IF NOT EXISTS idx_projects_order      ON projects(order_index);
+CREATE INDEX IF NOT EXISTS idx_projects_category   ON projects(category);
+CREATE INDEX IF NOT EXISTS idx_projects_published  ON projects(is_published);
+CREATE INDEX IF NOT EXISTS idx_projects_completed  ON projects(completed_at);
+CREATE INDEX IF NOT EXISTS idx_projects_complexity ON projects(complexity);
+
 -- ── Índices ────────────────────────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_attachments_entity    ON attachments(entity_type, entity_id);
 CREATE INDEX IF NOT EXISTS idx_invoices_site         ON invoices(site_id);
