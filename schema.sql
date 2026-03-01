@@ -94,6 +94,7 @@ CREATE TABLE IF NOT EXISTS projects (
     is_published     INTEGER  NOT NULL DEFAULT 1,
     created_at       DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at       DATETIME DEFAULT CURRENT_TIMESTAMP
+    logo_r2_key TEXT DEFAULT NULL;
     );
 
 CREATE INDEX IF NOT EXISTS idx_projects_order      ON projects(order_index);
@@ -101,6 +102,7 @@ CREATE INDEX IF NOT EXISTS idx_projects_category   ON projects(category);
 CREATE INDEX IF NOT EXISTS idx_projects_published  ON projects(is_published);
 CREATE INDEX IF NOT EXISTS idx_projects_completed  ON projects(completed_at);
 CREATE INDEX IF NOT EXISTS idx_projects_complexity ON projects(complexity);
+CREATE INDEX IF NOT EXISTS idx_projects_logo ON projects(logo_r2_key);
 
 -- ── Índices ────────────────────────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_attachments_entity    ON attachments(entity_type, entity_id);

@@ -295,7 +295,6 @@ export default function Home() {
           </div>
         </section>
 
-
         {/* ───── PORTFOLIO ───── */}
         <section id="portfolio" className="py-14 px-4 bg-gray-50 dark:bg-gray-900/50">
           <div className="max-w-6xl mx-auto">
@@ -322,9 +321,20 @@ export default function Home() {
                           className="group block p-6 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl cursor-pointer"
                       >
                         <div className="flex items-center justify-between mb-4">
-                          <div className="w-11 h-11 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center text-white font-bold text-lg">
-                            {project.title[0]}
-                          </div>
+                          {/* Logo ou fallback com primeira letra */}
+                          {project.logo_r2_key ? (
+                              <div className="w-11 h-11 rounded-xl flex items-center justify-center bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-1.5 shadow-sm">
+                                <img
+                                    src={`/uploads/${project.logo_r2_key}`}
+                                    alt={`${project.title} logo`}
+                                    className="w-full h-full object-contain"
+                                />
+                              </div>
+                          ) : (
+                              <div className="w-11 h-11 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-blue-500/30">
+                                {project.title[0]}
+                              </div>
+                          )}
                           <span className="text-xs font-medium text-blue-600 bg-blue-50 dark:bg-blue-950 px-3 py-1 rounded-full">
                   {project.category}
                 </span>

@@ -46,7 +46,7 @@ export async function action({ request, context }: Route.ActionArgs) {
         const id      = Number(formData.get("id"));
         const project = await deleteProjectById(db, id);
         if (project) {
-            const keys = [project.cover_image_key, project.image_1_key, project.image_2_key, project.image_3_key];
+            const keys = [project.logo_r2_key, project.cover_image_key, project.image_1_key, project.image_2_key, project.image_3_key];
             await Promise.all(keys.filter(Boolean).map((k) => deleteFile(bucket, k!)));
         }
         return redirect("/admin/projects");
@@ -73,8 +73,8 @@ export async function action({ request, context }: Route.ActionArgs) {
     }
 
     // ── Tratamento de imagens ─────────────────────────────────────
-    const imageFields = ["cover_image", "image_1", "image_2", "image_3"] as const;
-    const dbFields    = ["cover_image_key", "image_1_key", "image_2_key", "image_3_key"] as const;
+    const imageFields = ["logo", "cover_image", "image_1", "image_2", "image_3"] as const;
+    const dbFields    = ["logo_r2_key", "cover_image_key", "image_1_key", "image_2_key", "image_3_key"] as const;
 
     let existingProject: Project | null = null;
     if (id) existingProject = await getProjectById(db, id);
@@ -99,7 +99,6 @@ export async function action({ request, context }: Route.ActionArgs) {
             await uploadFile(bucket, key, file);
             imageKeys[dbField] = key;
         }
-        // undefined = sem alteração (só relevante no update)
     }
 
     if (id) {
@@ -110,10 +109,11 @@ export async function action({ request, context }: Route.ActionArgs) {
     } else {
         await createProject(db, {
             title, slug, category, order_index, summary, description, link,
-            cover_image_key: imageKeys["cover_image_key"] ?? null,
-            image_1_key:     imageKeys["image_1_key"]     ?? null,
-            image_2_key:     imageKeys["image_2_key"]     ?? null,
-            image_3_key:     imageKeys["image_3_key"]     ?? null,
+            logo_r2_key:     imageKeys["logo_r2_key"]         ?? null,  // ← NOVO
+            cover_image_key: imageKeys["cover_image_key"]     ?? null,
+            image_1_key:     imageKeys["image_1_key"]         ?? null,
+            image_2_key:     imageKeys["image_2_key"]         ?? null,
+            image_3_key:     imageKeys["image_3_key"]         ?? null,
             tags, completed_at, complexity, is_published,
         });
     }
@@ -430,6 +430,31 @@ export default function AdminProjects() {
                                         placeholder="React, Tailwind, D1"
                                         className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                                     />
+                                </div>
+
+                                {/* Logo */}
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1">Logo do projeto</label>
+                                    {selected?.logo_r2_key && (
+                                        <div className="flex items-center gap-3 mb-2">
+                                            <img
+                                                src={`/uploads/${selected.logo_r2_key}`}
+                                                alt="Logo"
+                                                className="w-16 h-16 object-contain rounded-lg border border-gray-200 dark:border-gray-700 bg-white p-2"
+                                            />
+                                            <label className="flex items-center gap-1.5 text-xs text-red-500 cursor-pointer">
+                                                <input type="checkbox" name="remove_logo" value="1" />
+                                                Remover logo atual
+                                            </label>
+                                        </div>
+                                    )}
+                                    <input
+                                        type="file"
+                                        name="logo"
+                                        accept="image/png,image/svg+xml,image/webp"
+                                        className="text-sm text-gray-500 file:mr-3 file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-600 file:text-xs file:font-medium hover:file:bg-blue-100 cursor-pointer"
+                                    />
+                                    <p className="text-xs text-gray-400 mt-1">Formatos: PNG, SVG ou WebP (fundo transparente recomendado)</p>
                                 </div>
 
                                 {/* Conclusão + Complexidade */}
