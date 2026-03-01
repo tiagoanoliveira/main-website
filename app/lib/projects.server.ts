@@ -105,3 +105,71 @@ export async function getAllTags(db: D1Database): Promise<string[]> {
     }
     return [...set].sort();
 }
+
+// ── Admin CRUD ──────────────────────────────────────────────────
+
+export async function getAllProjectsForAdmin(db: D1Database): Promise<Project[]> {
+    const { results } = await db
+        .prepare("SELECT * FROM projects ORDER BY order_index ASC, created_at DESC")
+        .all<Project>();
+    return results ?? [];
+}
+
+export async function getProjectById(db: D1Database, id: number): Promise<Project | null> {
+    return db.prepare("SELECT * FROM projects WHERE id = ?").bind(id).first<Project>();
+}
+
+export async function createProject(
+    db: D1Database,
+    data: {
+        slug: string; title: string; category: string; order_index: number;
+        summary: string; description: string; link: string | null;
+        cover_image_key: string | null; image_1_key: string | null;
+        image_2_key: string | null; image_3_key: string | null;
+        tags: string; completed_at: string | null; complexity: number; is_published: number;
+    }
+): Promise<number> {
+    const r = await db.prepare(`
+    INSERT INTO projects (
+      slug, title, category, order_index, summary, description, link,
+      cover_image_key, image_1_key, image_2_key, image_3_key,
+      tags, completed_at, complexity, is_published, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+  `).bind(
+        data.slug, data.title, data.category, data.order_index,
+        data.summary, data.description, data.link,
+        data.cover_image_key, data.image_1_key, data.image_2_key, data.image_3_key,
+        data.tags, data.completed_at, data.complexity, data.is_published
+    ).run();
+    return Number(r.meta.last_row_id);
+}
+
+export async function updateProject(
+    db: D1Database, id: number,
+    data: Partial<Omit<Project, "id" | "created_at">>
+): Promise<void> {
+    const fieldMap: (keyof typeof data)[] = [
+        "slug", "title", "category", "order_index", "summary", "description", "link",
+        "cover_image_key", "image_1_key", "image_2_key", "image_3_key",
+        "tags", "completed_at", "complexity", "is_published",
+    ];
+    const sets: string[] = [];
+    const vals: (string | number | null)[] = [];
+    for (const f of fieldMap) {
+        if (data[f] !== undefined) {
+            sets.push(`${f} = ?`);
+            vals.push(data[f] as string | number | null);
+        }
+    }
+    if (sets.length === 0) return;
+    sets.push("updated_at = datetime('now')");
+    vals.push(id);
+    await db.prepare(`UPDATE projects SET ${sets.join(", ")} WHERE id = ?`).bind(...vals).run();
+}
+
+export async function deleteProjectById(db: D1Database, id: number): Promise<Project | null> {
+    const project = await db.prepare("SELECT * FROM projects WHERE id = ?").bind(id).first<Project>();
+    if (!project) return null;
+    await db.prepare("DELETE FROM projects WHERE id = ?").bind(id).run();
+    return project;
+}

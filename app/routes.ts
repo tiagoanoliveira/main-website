@@ -26,6 +26,7 @@ export default [
             route("tickets/:id", "routes/admin.tickets.$id.tsx"),
             route("clients",     "routes/admin.clients.tsx"),
             route("invoices",    "routes/admin.invoices.tsx"),
+            route("projects",    "routes/admin.projects.tsx"),
         ]),
     ]),
 

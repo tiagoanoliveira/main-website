@@ -124,7 +124,7 @@ export default function Home() {
 
         {/* ───── HERO ───── */}
         {/* px-4 em vez de overflow-hidden isola os orbs sem cortar conteúdo */}
-        <section className="relative min-h-[95vh] flex items-center justify-center px-4 pt-16">
+        <section className="relative min-h-[95vh] flex items-center justify-center px-4">
 
           {/* Orbs animados — pointer-events-none evita qualquer interacção */}
           <div className="absolute inset-0 pointer-events-none overflow-hidden">
@@ -175,11 +175,7 @@ export default function Home() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: 0.1 }}
             >
-              Tiago{" "}
-              <span className="relative">
-                <span className="relative z-10 text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">Ol</span>
-                iveira
-              </span>
+              Tiago Oliveira
             </motion.h1>
 
             <motion.p
@@ -188,7 +184,11 @@ export default function Home() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: 0.2 }}
             >
-              Engenheiro Informático · Porto, Portugal
+              <span className="relative">
+                <span className="relative z-10 text-transparent bg-clip-text bg-gradient-to-r from-teal-500 to-sky-800">Engenheiro Informático </span>
+                 · Porto, Portugal
+              </span>
+
             </motion.p>
 
             <motion.p

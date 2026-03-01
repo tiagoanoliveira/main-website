@@ -1,7 +1,7 @@
 // app/components/layout/AdminLayout.tsx
 import { Link, useLocation, Form } from "react-router";
 import {
-    LayoutDashboard, TicketCheck, UserRoundCog, FileText, LogOut, Menu, X,
+    LayoutDashboard, TicketCheck, UserRoundCog, FileText, FolderOpen, LogOut, Menu, X,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -10,6 +10,7 @@ const navItems = [
     { href: "/admin/tickets",   label: "Tickets",   icon: TicketCheck },
     { href: "/admin/clients",   label: "Clientes",  icon: UserRoundCog },
     { href: "/admin/invoices",  label: "Faturas",   icon: FileText },
+    { href: "/admin/projects",  label: "Projetos",  icon: FolderOpen },   // ← novo
 ];
 
 interface Props {
