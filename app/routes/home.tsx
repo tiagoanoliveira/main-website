@@ -9,6 +9,7 @@ import { useState } from "react";
 import { Menu, X, User } from "lucide-react";
 import type { Route } from "./+types/home";
 import { getPublishedProjects } from "~/lib/projects.server";
+import { getSessionUser } from "~/lib/auth.server";
 
 export const meta: MetaFunction = () => [
   { title: "Tiago Oliveira" },
@@ -16,14 +17,13 @@ export const meta: MetaFunction = () => [
   { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
 ];
 
-export async function loader({ context }: Route.LoaderArgs) {
+export async function loader({ request, context }: Route.LoaderArgs) {
   const db = context.cloudflare.env.DB;
-  const projects = await getPublishedProjects(db, {
-    sortBy: "order_index",
-    sortDir: "asc",
-    limit: 2,
-  });
-  return { projects };
+  const [projects, user] = await Promise.all([
+    getPublishedProjects(db, { sortBy: "order_index", sortDir: "asc", limit: 2 }),
+    getSessionUser(db, request),
+  ]);
+  return { projects, isLoggedIn: !!user };
 }
 
 const stats = [
@@ -43,7 +43,7 @@ const navLinks = [
 
 export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
-  const { projects } = useLoaderData<typeof loader>();
+  const { projects, isLoggedIn } = useLoaderData<typeof loader>();
 
   return (
       // overflow-x-hidden no wrapper raiz elimina o scroll horizontal em mobile
@@ -72,7 +72,7 @@ export default function Home() {
                   className="flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors"
               >
                 <User size={14} />
-                Minha Conta
+                {isLoggedIn ? "Minha Conta" : "Login"}
               </Link>
             </nav>
 
@@ -83,7 +83,7 @@ export default function Home() {
                   className="flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors"
               >
                 <User size={13} />
-                Conta
+                {isLoggedIn ? "Conta" : "Login"}
               </Link>
               <button
                   type="button"
@@ -258,10 +258,26 @@ export default function Home() {
         {/* ───── SOBRE ───── */}
         <section id="sobre" className="py-14 px-4">
           <div className="max-w-6xl mx-auto">
+            {/* Header com foto + títulos */}
             <AnimatedSection>
-              <p className="text-sm font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-3">Sobre mim</p>
-              <h2 className="text-4xl font-bold mb-8 max-w-xl">Muito mais do que um Engenheiro</h2>
+              <div className="flex items-center gap-4 mb-8">
+                <img
+                    src="/profile.jpg"
+                    alt="Tiago Oliveira"
+                    className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl object-cover flex-shrink-0 shadow-lg ring-2 ring-blue-100 dark:ring-blue-900"
+                />
+                <div>
+                  <p className="text-sm font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-1.5">
+                    Sobre mim
+                  </p>
+                  <h2 className="text-3xl sm:text-4xl font-bold">
+                    Muito mais do que um Engenheiro
+                  </h2>
+                </div>
+              </div>
             </AnimatedSection>
+
+            {/* Conteúdo */}
             <div className="grid sm:grid-cols-3 gap-16 items-center">
               <AnimatedSection direction="left" className="sm:col-span-2">
                 <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
@@ -278,6 +294,7 @@ export default function Home() {
             </div>
           </div>
         </section>
+
 
         {/* ───── PORTFOLIO ───── */}
         <section id="portfolio" className="py-14 px-4 bg-gray-50 dark:bg-gray-900/50">

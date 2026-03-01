@@ -1,9 +1,11 @@
 import { type RouteConfig, index, route, layout, prefix } from "@react-router/dev/routes";
 
 export default [
-    // Zona pública
+    // Homepage isolada (tem navbar próprio)
+    index("routes/home.tsx"),
+
+    // Zona pública com Navbar partilhado
     layout("routes/_public.tsx", [
-        index("routes/home.tsx"),
         route("projects",       "routes/projects._index.tsx"),
         route("projects/:slug", "routes/projects.$slug.tsx"),
     ]),
@@ -13,12 +15,12 @@ export default [
     route("support/:token/success", "routes/support.$token.success.tsx"),
     route("ticket/:token",          "routes/ticket.$token.tsx"),
 
-    // Uploads (nível raiz — acessível a clientes, admins e portal)
+    // Uploads
     route("uploads/*", "routes/uploads.$key.ts"),
 
     // Admin
-    route("admin",         "routes/admin._index.tsx"),
-    route("admin/logout",  "routes/admin.logout.tsx"),
+    route("admin",        "routes/admin._index.tsx"),
+    route("admin/logout", "routes/admin.logout.tsx"),
     layout("routes/admin.layout.tsx", [
         ...prefix("admin", [
             route("dashboard",   "routes/admin.dashboard.tsx"),
@@ -31,8 +33,8 @@ export default [
     ]),
 
     // Portal do cliente
-    route("portal",               "routes/portal._index.tsx"),
-    route("portal/logout",        "routes/portal.logout.tsx"),
+    route("portal",                "routes/portal._index.tsx"),
+    route("portal/logout",         "routes/portal.logout.tsx"),
     route("portal/reset-password", "routes/portal.reset-password.tsx"),
     layout("routes/portal.layout.tsx", [
         ...prefix("portal", [

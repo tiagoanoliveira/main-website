@@ -1,12 +1,16 @@
-import { Link, useLocation } from "react-router";
+// app/components/layout/Navbar.tsx
+import { Link } from "react-router";
+import { User } from "lucide-react";
 
-export default function Navbar() {
-    const location = useLocation();
+interface Props {
+    isLoggedIn?: boolean;
+}
 
+export default function Navbar({ isLoggedIn = false }: Props) {
     const links = [
-        { href: "/", label: "Início" },
-        { href: "/#sobre", label: "Sobre" },
-        { href: "/#portfolio", label: "Portfólio" },
+        { href: "/",          label: "Início" },
+        { href: "/#sobre",    label: "Sobre" },
+        { href: "/projects",  label: "Projetos" },
         { href: "/#contacto", label: "Contacto" },
     ];
 
@@ -27,6 +31,15 @@ export default function Navbar() {
                             </a>
                         </li>
                     ))}
+                    <li>
+                        <Link
+                            to="/portal"
+                            className="flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+                        >
+                            <User size={14} />
+                            {isLoggedIn ? "Minha Conta" : "Login"}
+                        </Link>
+                    </li>
                 </ul>
             </nav>
         </header>
