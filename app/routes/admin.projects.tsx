@@ -1,5 +1,5 @@
 // app/routes/admin.projects.tsx
-import { redirect, useLoaderData, useActionData, Form } from "react-router";
+import { redirect, useLoaderData, Form, useFetcher } from "react-router";
 import type { Route } from "./+types/admin.projects";
 import { getSessionUser } from "~/lib/auth.server";
 import {
@@ -8,10 +8,10 @@ import {
 } from "~/lib/projects.server";
 import type { Project } from "~/lib/projects.server";
 import { uploadFile, deleteFile } from "~/lib/storage";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
     Plus, Pencil, Trash2, Eye, EyeOff, ExternalLink,
-    ChevronUp, ChevronDown, X,
+    X, Loader,
 } from "lucide-react";
 
 // ── Loader ──────────────────────────────────────────────────────
@@ -55,21 +55,21 @@ export async function action({ request, context }: Route.ActionArgs) {
     // ── Criar / Editar ────────────────────────────────────────────
     const id = formData.get("id") ? Number(formData.get("id")) : null;
 
-    const title       = String(formData.get("title")        ?? "").trim();
-    const slug        = String(formData.get("slug")         ?? "").trim();
-    const category    = String(formData.get("category")     ?? "").trim();
-    const order_index = Number(formData.get("order_index")  ?? 0);
-    const summary     = String(formData.get("summary")      ?? "").trim();
-    const description = String(formData.get("description")  ?? "").trim();
-    const link        = String(formData.get("link")         ?? "").trim() || null;
-    const tagsRaw     = String(formData.get("tags")         ?? "").trim();
-    const tags        = JSON.stringify(tagsRaw.split(",").map((t) => t.trim()).filter(Boolean));
+    const title        = String(formData.get("title")        ?? "").trim();
+    const slug         = String(formData.get("slug")         ?? "").trim();
+    const category     = String(formData.get("category")     ?? "").trim();
+    const order_index  = Number(formData.get("order_index")  ?? 0);
+    const summary      = String(formData.get("summary")      ?? "").trim();
+    const description  = String(formData.get("description")  ?? "").trim();
+    const link         = String(formData.get("link")         ?? "").trim() || null;
+    const tagsRaw      = String(formData.get("tags")         ?? "").trim();
+    const tags         = JSON.stringify(tagsRaw.split(",").map((t) => t.trim()).filter(Boolean));
     const completed_at = String(formData.get("completed_at") ?? "").trim() || null;
-    const complexity  = Math.min(5, Math.max(1, Number(formData.get("complexity") ?? 1)));
+    const complexity   = Math.min(5, Math.max(1, Number(formData.get("complexity") ?? 1)));
     const is_published = formData.get("is_published") === "1" ? 1 : 0;
 
     if (!title || !slug || !category || !summary) {
-        return { error: "Preenche os campos obrigatórios: título, slug, categoria e resumo." };
+        return { ok: false, error: "Preenche os campos obrigatórios: título, slug, categoria e resumo." };
     }
 
     // ── Tratamento de imagens ─────────────────────────────────────
@@ -118,7 +118,7 @@ export async function action({ request, context }: Route.ActionArgs) {
         });
     }
 
-    return redirect("/admin/projects");
+    return { ok: true };
 }
 
 // ── Helpers ─────────────────────────────────────────────────────
@@ -131,14 +131,21 @@ const COMPLEXITY_LABELS = ["", "Muito baixa", "Baixa", "Média", "Alta", "Muito 
 
 // ── Componente ──────────────────────────────────────────────────
 export default function AdminProjects() {
-    const { projects }  = useLoaderData<typeof loader>();
-    const actionData    = useActionData<typeof action>();
+    const { projects } = useLoaderData<typeof loader>();
+    const fetcher      = useFetcher<{ ok?: boolean; error?: string }>();
 
-    const [formOpen, setFormOpen]             = useState(false);
-    const [selected, setSelected]             = useState<Project | null>(null);
-    const [deleteConfirm, setDeleteConfirm]   = useState<number | null>(null);
-    const [complexity, setComplexity]         = useState(1);
-    const [slugValue, setSlugValue]           = useState("");
+    const [formOpen,       setFormOpen]       = useState(false);
+    const [selected,       setSelected]       = useState<Project | null>(null);
+    const [deleteConfirm,  setDeleteConfirm]  = useState<number | null>(null);
+    const [complexity,     setComplexity]     = useState(1);
+    const [slugValue,      setSlugValue]      = useState("");
+
+    // Fecha o drawer automaticamente quando o fetcher conclui com sucesso
+    useEffect(() => {
+        if (fetcher.state === "idle" && fetcher.data?.ok) {
+            closeForm();
+        }
+    }, [fetcher.state, fetcher.data]);
 
     function openCreate() {
         setSelected(null);
@@ -155,6 +162,8 @@ export default function AdminProjects() {
     }
 
     function closeForm() { setFormOpen(false); setSelected(null); }
+
+    const isSaving = fetcher.state !== "idle";
 
     return (
         <div className="max-w-6xl mx-auto">
@@ -198,9 +207,9 @@ export default function AdminProjects() {
                                     <div className="text-xs text-gray-400 font-mono">{p.slug}</div>
                                 </td>
                                 <td className="px-4 py-3 hidden md:table-cell">
-                    <span className="px-2 py-1 bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 rounded-full text-xs">
-                      {p.category}
-                    </span>
+                                        <span className="px-2 py-1 bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 rounded-full text-xs">
+                                            {p.category}
+                                        </span>
                                 </td>
                                 <td className="px-4 py-3 hidden lg:table-cell">
                                     <div className="flex gap-0.5">
@@ -235,17 +244,17 @@ export default function AdminProjects() {
                                         </button>
                                         {deleteConfirm === p.id ? (
                                             <span className="flex items-center gap-1">
-                          <Form method="post">
-                            <input type="hidden" name="intent" value="delete" />
-                            <input type="hidden" name="id"     value={p.id} />
-                            <button type="submit" className="px-2 py-1 bg-red-600 text-white rounded text-xs font-medium">
-                              Confirmar
-                            </button>
-                          </Form>
-                          <button onClick={() => setDeleteConfirm(null)} className="p-1 text-gray-400 hover:text-gray-600">
-                            <X size={13} />
-                          </button>
-                        </span>
+                                                    <Form method="post">
+                                                        <input type="hidden" name="intent" value="delete" />
+                                                        <input type="hidden" name="id"     value={p.id} />
+                                                        <button type="submit" className="px-2 py-1 bg-red-600 text-white rounded text-xs font-medium">
+                                                            Confirmar
+                                                        </button>
+                                                    </Form>
+                                                    <button onClick={() => setDeleteConfirm(null)} className="p-1 text-gray-400 hover:text-gray-600">
+                                                        <X size={13} />
+                                                    </button>
+                                                </span>
                                         ) : (
                                             <button onClick={() => setDeleteConfirm(p.id)}
                                                     className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors">
@@ -278,7 +287,7 @@ export default function AdminProjects() {
 
                         {/* Form */}
                         <div className="flex-1 overflow-y-auto">
-                            <Form
+                            <fetcher.Form
                                 key={selected?.id ?? "new"}
                                 method="post"
                                 encType="multipart/form-data"
@@ -287,9 +296,9 @@ export default function AdminProjects() {
                                 <input type="hidden" name="intent" value={selected ? "update" : "create"} />
                                 {selected && <input type="hidden" name="id" value={selected.id} />}
 
-                                {actionData?.error && (
+                                {fetcher.data?.error && (
                                     <div className="p-3 bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 rounded-lg text-sm">
-                                        {actionData.error}
+                                        {fetcher.data.error}
                                     </div>
                                 )}
 
@@ -342,7 +351,9 @@ export default function AdminProjects() {
 
                                 {/* Resumo */}
                                 <div>
-                                    <label className="block text-xs font-medium text-gray-500 mb-1">Resumo * <span className="font-normal text-gray-400">(aparece nos cards)</span></label>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1">
+                                        Resumo * <span className="font-normal text-gray-400">(aparece nos cards)</span>
+                                    </label>
                                     <textarea
                                         name="summary"
                                         defaultValue={selected?.summary ?? ""}
@@ -469,19 +480,25 @@ export default function AdminProjects() {
                                 <div className="flex gap-3 pt-2 pb-4">
                                     <button
                                         type="submit"
-                                        className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-colors"
+                                        disabled={isSaving}
+                                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg font-medium text-sm transition-colors"
                                     >
-                                        {selected ? "Guardar alterações" : "Criar projeto"}
+                                        {isSaving ? (
+                                            <><Loader size={14} className="animate-spin" /> A guardar...</>
+                                        ) : (
+                                            selected ? "Guardar alterações" : "Criar projeto"
+                                        )}
                                     </button>
                                     <button
                                         type="button"
                                         onClick={closeForm}
-                                        className="px-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                                        disabled={isSaving}
+                                        className="px-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
                                     >
                                         Cancelar
                                     </button>
                                 </div>
-                            </Form>
+                            </fetcher.Form>
                         </div>
                     </aside>
                 </>
