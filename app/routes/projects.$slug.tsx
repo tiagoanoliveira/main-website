@@ -1,15 +1,14 @@
 // app/routes/projects.$slug.tsx
 import { useLoaderData, Link } from "react-router";
-import type { MetaFunction } from "react-router";
 import type { Route } from "./+types/projects.$slug";
 import { getProjectBySlug } from "~/lib/projects.server";
 import { marked } from "marked";
 import { ExternalLink, Calendar, Zap } from "lucide-react";
 
 // ── Meta dinâmica (SEO + Open Graph) ───────────────────────────
-export const meta: MetaFunction<typeof loader> = ({ data }) => {
+export const meta = ({ data }: Route.MetaArgs) => {
     if (!data) return [{ title: "Projeto | Tiago Oliveira" }];
-    const { project } = data;
+    const { project } = data
     return [
         { title: `${project.title} | Tiago Oliveira` },
         { name: "description", content: project.summary },

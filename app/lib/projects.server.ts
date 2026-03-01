@@ -1,6 +1,4 @@
 // app/lib/projects.server.ts
-import type { D1Database } from "@cloudflare/workers-types";
-
 export interface Project {
     id: number;
     slug: string;
