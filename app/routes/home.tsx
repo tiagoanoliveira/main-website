@@ -32,7 +32,7 @@ const stats = [
 ];
 
 const skills = [
-  "HTML", "CSS", "JavaScript", "React", "PHP", "SQL", "Linux", "DNS", "SEO",
+  "HTML", "CSS", "JavaScript", "React", "PHP", "SQLite", "PostgreSQL", "Linux", "DNS", "SEO",
 ];
 
 const navLinks = [
@@ -238,7 +238,7 @@ export default function Home() {
         </section>
 
         {/* ───── SKILLS ───── */}
-        <section className="py-12 border-y border-gray-100 dark:border-gray-800 overflow-hidden">
+        <section className="py-6 border-y border-gray-100 dark:border-gray-800 overflow-hidden">
           <motion.div
               className="flex gap-8 whitespace-nowrap"
               animate={{ x: ["0%", "-50%"] }}
@@ -256,7 +256,7 @@ export default function Home() {
         </section>
 
         {/* ───── SOBRE ───── */}
-        <section id="sobre" className="py-14 px-4">
+        <section id="sobre" className="py-10 px-4">
           <div className="max-w-6xl mx-auto">
             {/* Header com foto + títulos */}
             <AnimatedSection>
@@ -296,7 +296,7 @@ export default function Home() {
         </section>
 
         {/* ───── PORTFOLIO ───── */}
-        <section id="portfolio" className="py-14 px-4 bg-gray-50 dark:bg-gray-900/50">
+        <section id="portfolio" className="py-10 px-4 bg-gray-50 dark:bg-gray-900/50">
           <div className="max-w-6xl mx-auto">
             <AnimatedSection>
               <div className="flex items-end justify-between mb-16">
@@ -367,18 +367,17 @@ export default function Home() {
         </section>
 
         {/* ───── CONTACTO ───── */}
-        <section id="contacto" className="py-20 sm:py-28 px-4">
-          <div className="max-w-2xl mx-auto">
-            <AnimatedSection className="relative rounded-3xl overflow-hidden p-8 sm:p-12 text-center bg-gradient-to-br from-blue-600 to-purple-700 shadow-2xl shadow-blue-500/25">
-              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-48 bg-white/10 rounded-full blur-3xl pointer-events-none" />
+        <section id="contacto" className="py-10 px-4">
+          <div className="max-w-xl mx-auto">
+            <AnimatedSection className="relative rounded-2xl overflow-hidden p-4 sm:p-6 text-center bg-gradient-to-br from-blue-600 to-purple-700 shadow-2xl shadow-blue-500/25">
               <div className="relative z-10">
-                <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">Vamos trabalhar juntos?</h2>
-                <p className="text-blue-100 mb-8 sm:mb-10 text-base sm:text-lg">Tens um projeto em mente? Fala comigo.</p>
+                <h2 className="text-xl sm:text-2xl font-bold text-white mb-1.5 sm:mb-3">Vamos trabalhar juntos?</h2>
+                <p className="text-blue-100 mb-3 sm:mb-4 text-base sm:text-lg">Tens um projeto em mente? Fala comigo.</p>
                 <motion.a
                     href="mailto:geral@tiagoanoliveira.pt"
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.97 }}
-                    className="inline-block px-6 sm:px-8 py-3 sm:py-4 bg-white text-blue-700 font-semibold rounded-xl hover:bg-blue-50 transition-colors text-base sm:text-lg shadow-xl break-all"
+                    className="inline-block px-3 sm:px-6 py-1.5 sm:py-3 bg-white text-blue-700 font-semibold rounded-xl hover:bg-blue-50 transition-colors text-base sm:text-lg shadow-xl break-all"
                 >
                   geral@tiagoanoliveira.pt
                 </motion.a>
