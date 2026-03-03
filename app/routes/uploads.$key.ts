@@ -3,17 +3,27 @@ import { data } from "react-router";
 import type { Route } from "./+types/uploads.$key";
 import { getSessionUser } from "~/lib/auth.server";
 
-// Captura qualquer path após /uploads/ incluindo barras (ex: invoice/2/uuid.png)
 export const unstable_path = "/uploads/*";
 
-export async function loader({ request, params, context }: Route.LoaderArgs) {
-    const env  = context.cloudflare.env;
-    const user = await getSessionUser(env.DB, request);
-    if (!user) throw data("Não autorizado", { status: 401 });
+// Prefixos de ficheiros públicos (sem autenticação necessária)
+const PUBLIC_PREFIXES = [
+    "projects/",
+];
 
-    // params["*"] captura tudo após /uploads/ incluindo barras
+export async function loader({ request, params, context }: Route.LoaderArgs) {
+    const env = context.cloudflare.env;
     const key = (params as Record<string, string>)["*"] ?? "";
+
     if (!key) throw data("Ficheiro não encontrado", { status: 404 });
+
+    // Verifica se o ficheiro é público
+    const isPublic = PUBLIC_PREFIXES.some((prefix) => key.startsWith(prefix));
+
+    // Se não for público, exige autenticação
+    if (!isPublic) {
+        const user = await getSessionUser(env.DB, request);
+        if (!user) throw data("Não autorizado", { status: 401 });
+    }
 
     const obj = await env.UPLOADS.get(key);
     if (!obj) throw data("Ficheiro não encontrado", { status: 404 });
@@ -23,9 +33,13 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
 
     const headers = new Headers();
     headers.set("Content-Type", contentType);
-    // inline = browser mostra imagem/PDF directamente em vez de forçar download
     headers.set("Content-Disposition", `inline; filename="${fileName}"`);
-    headers.set("Cache-Control", "private, max-age=3600");
+    headers.set(
+        "Cache-Control",
+        isPublic
+            ? "public, max-age=31536000, immutable"
+            : "private, max-age=3600"
+    );
 
     return new Response(obj.body as ReadableStream, { headers });
 }
