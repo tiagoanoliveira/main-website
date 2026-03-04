@@ -8,6 +8,7 @@ export const unstable_path = "/uploads/*";
 // Prefixos de ficheiros públicos (sem autenticação necessária)
 const PUBLIC_PREFIXES = [
     "projects/",
+    "clients/",
 ];
 
 export async function loader({ request, params, context }: Route.LoaderArgs) {
