@@ -13,6 +13,8 @@ import {
     Plus, Pencil, Trash2, Eye, EyeOff, ExternalLink,
     X, Loader,
 } from "lucide-react";
+import ProjectStatusBadge from "~/components/ui/ProjectStatusBadge";
+import type { ProjectStatus } from "~/components/ui/ProjectStatusBadge";
 
 // ── Loader ──────────────────────────────────────────────────────
 export async function loader({ request, context }: Route.LoaderArgs) {
@@ -66,6 +68,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     const tags         = JSON.stringify(tagsRaw.split(",").map((t) => t.trim()).filter(Boolean));
     const completed_at = String(formData.get("completed_at") ?? "").trim() || null;
     const complexity   = Math.min(5, Math.max(1, Number(formData.get("complexity") ?? 1)));
+    const status       = String(formData.get("status") ?? "completed") as Project["status"];
     const is_published = formData.get("is_published") === "1" ? 1 : 0;
 
     if (!title || !slug || !category || !summary) {
@@ -104,17 +107,17 @@ export async function action({ request, context }: Route.ActionArgs) {
     if (id) {
         await updateProject(db, id, {
             title, slug, category, order_index, summary, description, link,
-            tags, completed_at, complexity, is_published, ...imageKeys,
+            tags, completed_at, complexity, status, is_published, ...imageKeys,
         });
     } else {
         await createProject(db, {
             title, slug, category, order_index, summary, description, link,
-            logo_r2_key:     imageKeys["logo_r2_key"]         ?? null,  // ← NOVO
+            logo_r2_key:     imageKeys["logo_r2_key"]         ?? null,
             cover_image_key: imageKeys["cover_image_key"]     ?? null,
             image_1_key:     imageKeys["image_1_key"]         ?? null,
             image_2_key:     imageKeys["image_2_key"]         ?? null,
             image_3_key:     imageKeys["image_3_key"]         ?? null,
-            tags, completed_at, complexity, is_published,
+            tags, completed_at, complexity, status, is_published,
         });
     }
 
@@ -129,6 +132,13 @@ function slugify(str: string) {
 
 const COMPLEXITY_LABELS = ["", "Muito baixa", "Baixa", "Média", "Alta", "Muito alta"];
 
+const STATUS_OPTIONS: { value: Project["status"]; label: string }[] = [
+    { value: "completed",   label: "✅ Concluído" },
+    { value: "in_progress", label: "🚧 Em construção" },
+    { value: "maintenance", label: "🔧 Em remodelação" },
+    { value: "archived",    label: "📦 Arquivado" },
+];
+
 // ── Componente ──────────────────────────────────────────────────
 export default function AdminProjects() {
     const { projects } = useLoaderData<typeof loader>();
@@ -140,7 +150,6 @@ export default function AdminProjects() {
     const [complexity,     setComplexity]     = useState(1);
     const [slugValue,      setSlugValue]      = useState("");
 
-    // Fecha o drawer automaticamente quando o fetcher conclui com sucesso
     useEffect(() => {
         if (fetcher.state === "idle" && fetcher.data?.ok) {
             closeForm();
@@ -192,6 +201,7 @@ export default function AdminProjects() {
                             <th className="px-4 py-3 text-left font-medium text-gray-500 w-12">#</th>
                             <th className="px-4 py-3 text-left font-medium text-gray-500">Título</th>
                             <th className="px-4 py-3 text-left font-medium text-gray-500 hidden md:table-cell">Categoria</th>
+                            <th className="px-4 py-3 text-left font-medium text-gray-500 hidden lg:table-cell">Estado</th>
                             <th className="px-4 py-3 text-left font-medium text-gray-500 hidden lg:table-cell">Complexidade</th>
                             <th className="px-4 py-3 text-left font-medium text-gray-500 hidden lg:table-cell">Conclusão</th>
                             <th className="px-4 py-3 text-center font-medium text-gray-500">Pub.</th>
@@ -207,9 +217,12 @@ export default function AdminProjects() {
                                     <div className="text-xs text-gray-400 font-mono">{p.slug}</div>
                                 </td>
                                 <td className="px-4 py-3 hidden md:table-cell">
-                                        <span className="px-2 py-1 bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 rounded-full text-xs">
-                                            {p.category}
-                                        </span>
+                                    <span className="px-2 py-1 bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 rounded-full text-xs">
+                                        {p.category}
+                                    </span>
+                                </td>
+                                <td className="px-4 py-3 hidden lg:table-cell">
+                                    <ProjectStatusBadge status={(p.status ?? "completed") as ProjectStatus} />
                                 </td>
                                 <td className="px-4 py-3 hidden lg:table-cell">
                                     <div className="flex gap-0.5">
@@ -244,17 +257,17 @@ export default function AdminProjects() {
                                         </button>
                                         {deleteConfirm === p.id ? (
                                             <span className="flex items-center gap-1">
-                                                    <Form method="post">
-                                                        <input type="hidden" name="intent" value="delete" />
-                                                        <input type="hidden" name="id"     value={p.id} />
-                                                        <button type="submit" className="px-2 py-1 bg-red-600 text-white rounded text-xs font-medium">
-                                                            Confirmar
-                                                        </button>
-                                                    </Form>
-                                                    <button onClick={() => setDeleteConfirm(null)} className="p-1 text-gray-400 hover:text-gray-600">
-                                                        <X size={13} />
+                                                <Form method="post">
+                                                    <input type="hidden" name="intent" value="delete" />
+                                                    <input type="hidden" name="id"     value={p.id} />
+                                                    <button type="submit" className="px-2 py-1 bg-red-600 text-white rounded text-xs font-medium">
+                                                        Confirmar
                                                     </button>
-                                                </span>
+                                                </Form>
+                                                <button onClick={() => setDeleteConfirm(null)} className="p-1 text-gray-400 hover:text-gray-600">
+                                                    <X size={13} />
+                                                </button>
+                                            </span>
                                         ) : (
                                             <button onClick={() => setDeleteConfirm(p.id)}
                                                     className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors">
@@ -484,6 +497,20 @@ export default function AdminProjects() {
                                             <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
                                         </div>
                                     </div>
+                                </div>
+
+                                {/* Estado */}
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1">Estado do projeto</label>
+                                    <select
+                                        name="status"
+                                        defaultValue={selected?.status ?? "completed"}
+                                        className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                    >
+                                        {STATUS_OPTIONS.map((o) => (
+                                            <option key={o.value} value={o.value}>{o.label}</option>
+                                        ))}
+                                    </select>
                                 </div>
 
                                 {/* Publicado */}
