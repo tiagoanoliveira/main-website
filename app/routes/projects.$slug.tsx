@@ -1,9 +1,13 @@
 // app/routes/projects.$slug.tsx
+import { useState } from "react";
 import { useLoaderData, Link } from "react-router";
 import type { Route } from "./+types/projects.$slug";
 import { getProjectBySlug } from "~/lib/projects.server";
 import { marked } from "marked";
 import { ExternalLink, Calendar, Zap } from "lucide-react";
+import Lightbox from "~/components/ui/Lightbox";
+import ProjectStatusBadge from "~/components/ui/ProjectStatusBadge";
+import type { ProjectStatus } from "~/components/ui/ProjectStatusBadge";
 
 // ── Meta dinâmica ────────────────────────────────────────────────
 export const meta = ({ data }: Route.MetaArgs) => {
@@ -43,8 +47,16 @@ export async function loader({ params, context }: Route.LoaderArgs) {
 // ── Componente ───────────────────────────────────────────────────
 export default function ProjectDetail() {
     const { project, descriptionHtml } = useLoaderData<typeof loader>();
-    const tags: string[]  = JSON.parse(project.tags ?? "[]");
-    const extraImages     = [project.image_1_key, project.image_2_key, project.image_3_key].filter(Boolean);
+    const tags: string[] = JSON.parse(project.tags ?? "[]");
+    const extraImages    = [project.image_1_key, project.image_2_key, project.image_3_key].filter(Boolean) as string[];
+
+    // Todas as imagens para o lightbox (capa + galeria)
+    const allImages = [
+        project.cover_image_key,
+        ...extraImages,
+    ].filter(Boolean).map((k) => `/uploads/${k}`);
+
+    const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
     return (
         <div className="min-h-screen bg-white dark:bg-gray-950 px-4 pb-20 pt-8">
@@ -58,9 +70,9 @@ export default function ProjectDetail() {
                     ← Todos os projetos
                 </Link>
 
-                {/* ── Logo (se existir, aparece antes da capa) ── */}
+                {/* ── Logo ── */}
                 {project.logo_r2_key && (
-                    <div className="mt-8 flex items-center gap-4">
+                    <div className="mt-8 flex items-center gap-3">
                         <div className="w-16 h-16 rounded-2xl flex items-center justify-center bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-2.5 shadow-lg flex-shrink-0">
                             <img
                                 src={`/uploads/${project.logo_r2_key}`}
@@ -68,61 +80,69 @@ export default function ProjectDetail() {
                                 className="w-full h-full object-contain"
                             />
                         </div>
-                        {/* Categoria ao lado do logo */}
                         <span className="text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950 px-3 py-1.5 rounded-full">
-              {project.category}
-            </span>
+                            {project.category}
+                        </span>
+                        <ProjectStatusBadge status={(project.status ?? "completed") as ProjectStatus} />
                     </div>
                 )}
 
-                {/* ── Imagem de capa ── */}
+                {/* ── Imagem de capa (clicável) ── */}
                 {project.cover_image_key && (
-                    <div className={`rounded-2xl overflow-hidden aspect-video bg-gray-100 dark:bg-gray-800 ${project.logo_r2_key ? "mt-5" : "mt-8"}`}>
+                    <div
+                        className={`rounded-2xl overflow-hidden aspect-video bg-gray-100 dark:bg-gray-800 cursor-zoom-in ${
+                            project.logo_r2_key ? "mt-5" : "mt-8"
+                        }`}
+                        onClick={() => setLightboxIndex(0)}
+                    >
                         <img
                             src={`/uploads/${project.cover_image_key}`}
                             alt={project.title}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-cover hover:scale-[1.02] transition-transform duration-300"
                         />
                     </div>
                 )}
 
-                {/* ── Cabeçalho do projeto ── */}
-                <div className={`mb-6 ${project.cover_image_key || project.logo_r2_key ? "mt-8" : "mt-8"}`}>
-                    {/* Categoria (só mostra aqui se não houver logo) */}
+                {/* ── Cabeçalho ── */}
+                <div className="mt-8 mb-6">
+                    {/* Categoria + estado (quando não há logo) */}
                     {!project.logo_r2_key && (
-                        <span className="inline-block text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950 px-3 py-1 rounded-full mb-4">
-              {project.category}
-            </span>
+                        <div className="flex flex-wrap items-center gap-2 mb-4">
+                            <span className="text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950 px-3 py-1 rounded-full">
+                                {project.category}
+                            </span>
+                            <ProjectStatusBadge status={(project.status ?? "completed") as ProjectStatus} />
+                        </div>
                     )}
 
                     {/* Meta: data + complexidade */}
                     <div className="flex flex-wrap items-center gap-4 mb-4">
                         {project.completed_at && (
                             <span className="flex items-center gap-1.5 text-xs text-gray-400">
-                <Calendar size={12} />
-                Concluído em{" "}
+                                <Calendar size={12} />
+                                Concluído em{" "}
                                 {new Date(project.completed_at).toLocaleDateString("pt-PT", {
                                     month: "long",
                                     year: "numeric",
                                 })}
-              </span>
+                            </span>
                         )}
                         <span className="flex items-center gap-1.5 text-xs text-gray-400">
-              <Zap size={12} />
-              Complexidade
-              <span className="flex gap-0.5 ml-1">
-                {Array.from({ length: 5 }).map((_, j) => (
-                    <div
-                        key={j}
-                        className={`h-2 w-4 rounded-full ${
-                            j < project.complexity
-                                ? "bg-blue-500"
-                                : "bg-gray-200 dark:bg-gray-700"
-                        }`}
-                    />
-                ))}
-              </span>
-            </span>
+                            <Zap size={12} />
+                            Complexidade
+                            <span className="flex gap-0.5 ml-1">
+                                {Array.from({ length: 5 }).map((_, j) => (
+                                    <div
+                                        key={j}
+                                        className={`h-2 w-4 rounded-full ${
+                                            j < project.complexity
+                                                ? "bg-blue-500"
+                                                : "bg-gray-200 dark:bg-gray-700"
+                                        }`}
+                                    />
+                                ))}
+                            </span>
+                        </span>
                     </div>
 
                     <h1 className="text-3xl sm:text-4xl font-bold mb-3 leading-tight">
@@ -174,7 +194,7 @@ export default function ProjectDetail() {
                     />
                 )}
 
-                {/* ── Galeria de imagens ── */}
+                {/* ── Galeria de imagens (clicável) ── */}
                 {extraImages.length > 0 && (
                     <div className="mt-12">
                         <h2 className="text-lg font-semibold mb-4">Galeria</h2>
@@ -182,7 +202,12 @@ export default function ProjectDetail() {
                             {extraImages.map((key, i) => (
                                 <div
                                     key={i}
-                                    className="aspect-video rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-800"
+                                    className="aspect-video rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-800 cursor-zoom-in"
+                                    onClick={() => {
+                                        // índice na allImages: capa é 0, galeria começa em 1
+                                        const offset = project.cover_image_key ? 1 : 0;
+                                        setLightboxIndex(offset + i);
+                                    }}
                                 >
                                     <img
                                         src={`/uploads/${key}`}
@@ -196,6 +221,17 @@ export default function ProjectDetail() {
                 )}
 
             </div>
+
+            {/* ── Lightbox ── */}
+            {lightboxIndex !== null && (
+                <Lightbox
+                    images={allImages}
+                    index={lightboxIndex}
+                    onClose={() => setLightboxIndex(null)}
+                    onPrev={() => setLightboxIndex((lightboxIndex - 1 + allImages.length) % allImages.length)}
+                    onNext={() => setLightboxIndex((lightboxIndex + 1) % allImages.length)}
+                />
+            )}
         </div>
     );
 }

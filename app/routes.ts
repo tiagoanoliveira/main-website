@@ -8,6 +8,7 @@ export default [
     layout("routes/_public.tsx", [
         route("projects",       "routes/projects._index.tsx"),
         route("projects/:slug", "routes/projects.$slug.tsx"),
+        route("cv",             "routes/cv.tsx"),
     ]),
 
     // Suporte público

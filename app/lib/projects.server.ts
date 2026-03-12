@@ -16,6 +16,7 @@ export interface Project {
     tags: string; // JSON string
     completed_at: string | null;
     complexity: number;
+    status: "completed" | "in_progress" | "maintenance" | "archived";
     is_published: number;
     created_at: string;
 }
@@ -54,7 +55,6 @@ export async function getPublishedProjects(
         params.push(category);
     }
     if (tag) {
-        // pesquisa simples dentro do JSON array
         conditions.push(`tags LIKE ?`);
         params.push(`%"${tag}"%`);
     }
@@ -90,7 +90,6 @@ export async function getDistinctCategories(db: D1Database): Promise<string[]> {
     return (results ?? []).map((r) => r.category);
 }
 
-// Extrai todas as tags únicas (percorre os JSON arrays)
 export async function getAllTags(db: D1Database): Promise<string[]> {
     const { results } = await db
         .prepare("SELECT tags FROM projects WHERE is_published = 1")
@@ -123,24 +122,25 @@ export async function createProject(
     data: {
         slug: string; title: string; category: string; order_index: number;
         summary: string; description: string; link: string | null;
-        logo_r2_key: string | null;              // ← NOVO
+        logo_r2_key: string | null;
         cover_image_key: string | null; image_1_key: string | null;
         image_2_key: string | null; image_3_key: string | null;
-        tags: string; completed_at: string | null; complexity: number; is_published: number;
+        tags: string; completed_at: string | null; complexity: number;
+        status: string; is_published: number;
     }
 ): Promise<number> {
     const r = await db.prepare(`
         INSERT INTO projects (
             slug, title, category, order_index, summary, description, link,
             logo_r2_key, cover_image_key, image_1_key, image_2_key, image_3_key,
-            tags, completed_at, complexity, is_published, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+            tags, completed_at, complexity, status, is_published, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
     `).bind(
         data.slug, data.title, data.category, data.order_index,
         data.summary, data.description, data.link,
-        data.logo_r2_key,                        // ← NOVO
+        data.logo_r2_key,
         data.cover_image_key, data.image_1_key, data.image_2_key, data.image_3_key,
-        data.tags, data.completed_at, data.complexity, data.is_published
+        data.tags, data.completed_at, data.complexity, data.status, data.is_published
     ).run();
     return Number(r.meta.last_row_id);
 }
@@ -151,9 +151,9 @@ export async function updateProject(
 ): Promise<void> {
     const fieldMap: (keyof typeof data)[] = [
         "slug", "title", "category", "order_index", "summary", "description", "link",
-        "logo_r2_key",                             // ← NOVO
+        "logo_r2_key",
         "cover_image_key", "image_1_key", "image_2_key", "image_3_key",
-        "tags", "completed_at", "complexity", "is_published",
+        "tags", "completed_at", "complexity", "status", "is_published",
     ];
     const sets: string[] = [];
     const vals: (string | number | null)[] = [];
