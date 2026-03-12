@@ -36,7 +36,7 @@ const skills = [
 ];
 
 const navLinks = [
-  { href: "#sobre",     label: "Sobre" },
+  { href: "/cv",     label: "CV" },
   { href: "#portfolio", label: "Portófolio" },
   { href: "#contacto",  label: "Contacto" },
 ];
@@ -92,12 +92,6 @@ export default function Home() {
               </a>
             ))}
             <Link
-              to="/cv"
-              className="text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
-            >
-              CV
-            </Link>
-            <Link
               to="/portal"
               className="flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors"
             >
@@ -146,13 +140,6 @@ export default function Home() {
                     {l.label}
                   </a>
                 ))}
-                <Link
-                  to="/cv"
-                  onClick={() => setMenuOpen(false)}
-                  className="text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 py-2.5 px-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
-                >
-                  CV
-                </Link>
               </nav>
             </motion.div>
           )}
@@ -361,12 +348,12 @@ export default function Home() {
           {/* Linha de experiências recentes resumidas */}
           <AnimatedSection>
             <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl p-6">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-4">Experiência recente</p>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-4">Atividade recente</p>
               <div className="space-y-4">
                 {[
-                  { role: "Websites com 🤍", org: "Fundador & Dev", period: "2020 — presente", color: "bg-purple-500" },
+                  { role: "Websites com 🤍", org: "Full-stack Freelancer", period: "2025 — presente", color: "bg-purple-500" },
                   { role: "Associação Juvenil Easy Future", org: "Presidente da direção", period: "2020 — presente", color: "bg-rose-500" },
-                  { role: "Eng. Informática e Computação", org: "FEUP", period: "2023 — 2026", color: "bg-blue-500" },
+                  { role: "Licenciatura em Eng. Informática e Computação", org: "FEUP", period: "2023 — 2026", color: "bg-blue-500" },
                 ].map((item) => (
                   <div key={item.role} className="flex items-center gap-4">
                     <div className={`w-2 h-2 rounded-full flex-shrink-0 ${item.color}`} />
@@ -377,14 +364,6 @@ export default function Home() {
                     <span className="text-xs text-gray-400 flex-shrink-0">{item.period}</span>
                   </div>
                 ))}
-              </div>
-              <div className="mt-5 pt-4 border-t border-gray-100 dark:border-gray-800">
-                <Link
-                  to="/cv"
-                  className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
-                >
-                  Ver CV completo com toda a experiência, formação e voluntariado <ArrowRight size={14} />
-                </Link>
               </div>
             </div>
           </AnimatedSection>

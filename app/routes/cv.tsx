@@ -13,9 +13,8 @@ const cv = {
             org: "Projeto pessoal de desenvolvimento web com impacto social",
             period: "2020 — presente",
             bullets: [
-                "Desenvolvimento de websites a custo nulo para estabelecimentos e organizações centradas no cliente, bem-estar e serviço de qualidade (em detrimento do lucro)",
-                "Custo nulo também para ONGs, Associações Juvenis e projetos com princípios alinhados com os meus valores",
-                "Custo reduzido para qualquer outro cliente que necessite de um website, software ou produto digital na minha área de atuação",
+                "Desenvolvimento de websites a custo nulo para estabelecimentos e organizações centradas no cliente, bem-estar e serviço de qualidade (em detrimento do lucro) e para ONGs, Associações Juvenis e projetos com princípios alinhados com os meus valores",
+                "Produção de software a custo reduzido para qualquer cliente que procure um website, software ou produto digital na minha área de atuação",
                 "Integração com serviços pré-existentes, adaptação às necessidades reais de cada negócio e desenvolvimento de identidades digitais",
             ],
         },
@@ -59,6 +58,12 @@ const cv = {
             bullets: [],
         },
         {
+            degree: "Licenciatura em Física",
+            school: "Faculdade de Ciências da Universidade do Porto (FCUP)",
+            period: "2020 - 2021",
+            bullets: [],
+        },
+        {
             degree: "Ensino Secundário — Ciências e Tecnologias (19 valores)",
             school: "Escola Secundária Alcaides de Faria",
             period: "2017 — 2020",
@@ -76,7 +81,7 @@ const cv = {
         {
             org: "Federação Portuguesa de Futebol",
             period: "set 2022 — presente",
-            desc: "Voluntário assíduo em jogos da Seleção Nacional Masculina e Feminina (Liga das Nações, qualificações para Mundiais e Europeus) nas áreas de hospitalidade, apoio ao adepto e bilheteira. Colaboração em simulacro médico com a equipa médica da seleção (UEFA Nations League, nov 2024).",
+            desc: "Coordenador de Acessos e outras áreas em jogos da Seleção Nacional Masculina e Feminina (Liga das Nações, qualificações para Mundiais e Europeus). Colaboração em simulacro médico com a equipa médica da seleção (UEFA Nations League, nov 2024).",
         },
         {
             org: "Associação Juvenil Easy Future",
