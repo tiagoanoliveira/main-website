@@ -307,43 +307,6 @@ export default function Home() {
               </div>
             </AnimatedSection>
           </div>
-        </div>
-      </section>
-
-      {/* ───── CV HIGHLIGHTS ───── */}
-      <section id="cv" className="py-10 px-4">
-        <div className="max-w-6xl mx-auto">
-          <AnimatedSection>
-            <div className="flex items-end justify-between mb-10">
-              <div>
-                <p className="text-sm font-semibold text-blue-600 uppercase tracking-widest mb-3">Percurso</p>
-                <h2 className="text-4xl font-bold">Quem sou profissionalmente</h2>
-              </div>
-              <Link
-                to="/cv"
-                className="hidden sm:inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
-              >
-                Ver CV completo <ArrowRight size={14} />
-              </Link>
-            </div>
-          </AnimatedSection>
-
-          {/* Cards de destaque */}
-          <div className="grid sm:grid-cols-3 gap-4 mb-8">
-            {cvHighlights.map((h, i) => (
-              <AnimatedSection key={h.label} delay={i * 0.1}>
-                <div className={`p-5 rounded-2xl border border-gray-100 dark:border-gray-800 ${h.bg} flex items-start gap-4`}>
-                  <div className={`p-2.5 rounded-xl bg-white dark:bg-gray-900 shadow-sm flex-shrink-0`}>
-                    <h.icon size={18} className={h.color} />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-sm text-gray-900 dark:text-white">{h.label}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{h.detail}</p>
-                  </div>
-                </div>
-              </AnimatedSection>
-            ))}
-          </div>
 
           {/* Linha de experiências recentes resumidas */}
           <AnimatedSection>
@@ -355,14 +318,14 @@ export default function Home() {
                   { role: "Associação Juvenil Easy Future", org: "Presidente da direção", period: "2020 — presente", color: "bg-rose-500" },
                   { role: "Licenciatura em Eng. Informática e Computação", org: "FEUP", period: "2023 — 2026", color: "bg-blue-500" },
                 ].map((item) => (
-                  <div key={item.role} className="flex items-center gap-4">
-                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${item.color}`} />
-                    <div className="flex-1 min-w-0">
-                      <span className="font-medium text-sm text-gray-900 dark:text-white">{item.role}</span>
-                      <span className="text-gray-400 text-sm"> · {item.org}</span>
+                    <div key={item.role} className="flex items-center gap-4">
+                      <div className={`w-2 h-2 rounded-full flex-shrink-0 ${item.color}`} />
+                      <div className="flex-1 min-w-0">
+                        <span className="font-medium text-sm text-gray-900 dark:text-white">{item.role}</span>
+                        <span className="text-gray-400 text-sm"> · {item.org}</span>
+                      </div>
+                      <span className="text-xs text-gray-400 flex-shrink-0">{item.period}</span>
                     </div>
-                    <span className="text-xs text-gray-400 flex-shrink-0">{item.period}</span>
-                  </div>
                 ))}
               </div>
             </div>
@@ -382,7 +345,7 @@ export default function Home() {
           <AnimatedSection>
             <div className="flex items-end justify-between mb-16">
               <div>
-                <p className="text-sm font-semibold text-blue-600 uppercase tracking-widest mb-3">Portófolio</p>
+                <p className="text-sm font-semibold text-blue-600 uppercase tracking-widest mb-2">Portófolio</p>
                 <h2 className="text-4xl font-bold">Projetos recentes</h2>
               </div>
               <Link
