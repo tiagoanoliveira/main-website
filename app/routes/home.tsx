@@ -276,7 +276,7 @@ export default function Home() {
       <section id="sobre" className="py-10 px-4">
         <div className="max-w-6xl mx-auto">
           <AnimatedSection>
-            <div className="flex items-center gap-4 mb-8">
+            <div className="flex items-center gap-4 mb-6">
               <img
                 src="/profile.jpg"
                 alt="Tiago Oliveira"
@@ -293,7 +293,7 @@ export default function Home() {
             </div>
           </AnimatedSection>
 
-          <div className="grid sm:grid-cols-3 gap-16 items-center">
+          <div className="grid sm:grid-cols-3 gap-10 items-center">
             <AnimatedSection direction="left" className="sm:col-span-2">
               <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
                 Além de Engenheiro informático com forte experiência em desenvolvimento web e softwares diversificados (sistemas de reservas, gestão de espaços, etc), considero-me um ser capaz de melhorar o mundo que me rodeia - incluindo não só vastos anos de dedicação na área do voluntáriado como ainda a aplicação de conhecimentos da minha àrea no apoio a negócios, pessoas e empresas que causam impacto na comunidade que os rodeia.
@@ -310,7 +310,7 @@ export default function Home() {
 
           {/* Linha de experiências recentes resumidas */}
           <AnimatedSection>
-            <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl p-6">
+            <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl p-6 mt-1.5">
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-4">Atividade recente</p>
               <div className="space-y-4">
                 {[
@@ -343,7 +343,7 @@ export default function Home() {
       <section id="portfolio" className="py-10 px-4 bg-gray-50 dark:bg-gray-900/50">
         <div className="max-w-6xl mx-auto">
           <AnimatedSection>
-            <div className="flex items-end justify-between mb-16">
+            <div className="flex items-end justify-between mb-12">
               <div>
                 <p className="text-sm font-semibold text-blue-600 uppercase tracking-widest mb-2">Portófolio</p>
                 <h2 className="text-4xl font-bold">Projetos recentes</h2>
