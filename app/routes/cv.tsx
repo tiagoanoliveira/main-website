@@ -9,6 +9,17 @@ const cv = {
 
     experience: [
         {
+            role: "Websites com 🤍 — Fundador & Dev",
+            org: "Projeto pessoal de desenvolvimento web com impacto social",
+            period: "2020 — presente",
+            bullets: [
+                "Desenvolvimento de websites a custo nulo para estabelecimentos e organizações centradas no cliente, bem-estar e serviço de qualidade (em detrimento do lucro)",
+                "Custo nulo também para ONGs, Associações Juvenis e projetos com princípios alinhados com os meus valores",
+                "Custo reduzido para qualquer outro cliente que necessite de um website, software ou produto digital na minha área de atuação",
+                "Integração com serviços pré-existentes, adaptação às necessidades reais de cada negócio e desenvolvimento de identidades digitais",
+            ],
+        },
+        {
             role: "Fundador & Presidente",
             org: "Associação Juvenil Easy Future",
             period: "2020 — presente",
