@@ -8,11 +8,12 @@ import { Loader2, Paperclip } from "lucide-react";
 import { useEffect } from "react";
 
 const CATEGORIES = [
-    "Problema com reserva",
     "Dúvida geral",
     "Acesso / Login",
     "Problema técnico",
-    "Cartão de fidelização",
+    "Problema com reserva",
+    "Sugestão de melhoria",
+    "Agradecimento",
     "Retificação / Eliminação de dados",
     "Outro",
 ];
