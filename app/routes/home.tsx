@@ -225,20 +225,20 @@ export default function Home() {
             transition={{ duration: 0.6, delay: 0.4 }}
           >
             <motion.a
-              href="#portfolio"
+              href="/cv"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.97 }}
               className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-colors shadow-lg shadow-blue-500/25"
             >
-              Ver Portófolio
+              Ver CV
             </motion.a>
             <motion.a
-              href="#contacto"
+              href="#portfolio"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.97 }}
               className="px-6 py-3 border border-gray-300 dark:border-gray-700 rounded-xl font-medium hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
             >
-              Contactar
+              Ver Portófolio
             </motion.a>
           </motion.div>
         </div>
