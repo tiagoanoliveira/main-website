@@ -16,6 +16,7 @@ import {
     createSiteWithOwner,
     updateSite,
     setResetToken,
+    GLOBAL_CATEGORY,
 } from "~/lib/db";
 import type { ExtraField, CategoryExtraFields, Site } from "~/lib/db";
 import { hashPassword } from "~/lib/auth.server";
@@ -118,19 +119,17 @@ export async function action({ request, context }: Route.ActionArgs) {
         return redirect("/admin/clients");
     }
 
-    // ── Guardar categorias e campos extra ──────────────────────
     if (intent === "updateFormConfig") {
         const id             = Number(form.get("id"));
-        const categoriesRaw  = String(form.get("categoriesJson")   || "").trim();
-        const extraFieldsRaw = String(form.get("extraFieldsJson")  || "").trim();
+        const categoriesRaw  = String(form.get("categoriesJson")  || "").trim();
+        const extraFieldsRaw = String(form.get("extraFieldsJson") || "").trim();
 
         if (!id) return data({ intent: "formConfig" as const, error: "ID inválido." }, { status: 400 });
 
-        // Validar JSON antes de guardar
         let categoriesJson: string | null = null;
         let extraFieldsJson: string | null = null;
         try {
-            if (categoriesRaw) { JSON.parse(categoriesRaw); categoriesJson = categoriesRaw; }
+            if (categoriesRaw)  { JSON.parse(categoriesRaw);  categoriesJson  = categoriesRaw; }
         } catch {
             return data({ intent: "formConfig" as const, error: "JSON de categorias inválido." }, { status: 400 });
         }
@@ -140,7 +139,6 @@ export async function action({ request, context }: Route.ActionArgs) {
             return data({ intent: "formConfig" as const, error: "JSON de campos extra inválido." }, { status: 400 });
         }
 
-        // Buscar nome e domínio actuais para não os perder no updateSite
         const { getSiteById } = await import("~/lib/db");
         const existing = await getSiteById(db, id);
         if (!existing) return data({ intent: "formConfig" as const, error: "Site não encontrado." }, { status: 404 });
@@ -198,7 +196,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     return null;
 }
 
-// ── Componentes auxiliares ──────────────────────────────────────
+// ── Componentes auxiliares ─────────────────────────────────────
 function CopyButton({ value, label = "" }: { value: string; label?: string }) {
     const [copied, setCopied] = useState(false);
     const copy = async () => {
@@ -247,11 +245,115 @@ function EmbedSnippet({ token, baseUrl }: { token: string; baseUrl: string }) {
     );
 }
 
-// ── Editor visual de categorias e campos extra ──────────────────
+// ── Editor de campos (reutilizável para global e por categoria) ──
+function FieldsEditor({
+    fields,
+    onChange,
+}: {
+    fields: ExtraField[];
+    onChange: (fields: ExtraField[]) => void;
+}) {
+    const addField = () =>
+        onChange([...fields, { name: "", label: "", type: "text", required: false }]);
+
+    const removeField = (idx: number) =>
+        onChange(fields.filter((_, i) => i !== idx));
+
+    const updateField = (idx: number, patch: Partial<ExtraField>) =>
+        onChange(fields.map((f, i) => (i === idx ? { ...f, ...patch } : f)));
+
+    return (
+        <div className="space-y-3">
+            {fields.map((field, idx) => (
+                <div key={idx} className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 space-y-2">
+                    <div className="grid grid-cols-2 gap-2">
+                        <div>
+                            <label className="block text-[10px] text-gray-400 mb-1">Nome interno (sem espaços)</label>
+                            <input
+                                value={field.name}
+                                onChange={(e) => updateField(idx, { name: e.target.value.replace(/\s/g, "") })}
+                                placeholder="orderNumber"
+                                className="w-full px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-[10px] text-gray-400 mb-1">Label visível</label>
+                            <input
+                                value={field.label}
+                                onChange={(e) => updateField(idx, { label: e.target.value })}
+                                placeholder="Nº de Encomenda"
+                                className="w-full px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
+                            />
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                        <div>
+                            <label className="block text-[10px] text-gray-400 mb-1">Placeholder (opcional)</label>
+                            <input
+                                value={field.placeholder ?? ""}
+                                onChange={(e) => updateField(idx, { placeholder: e.target.value })}
+                                placeholder="ex: #1234"
+                                className="w-full px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-[10px] text-gray-400 mb-1">Tipo</label>
+                            <select
+                                value={field.type}
+                                onChange={(e) => updateField(idx, { type: e.target.value as ExtraField["type"] })}
+                                className="w-full px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
+                            >
+                                <option value="text">Texto</option>
+                                <option value="number">Número</option>
+                                <option value="select">Seleção (dropdown)</option>
+                            </select>
+                        </div>
+                    </div>
+                    {field.type === "select" && (
+                        <div>
+                            <label className="block text-[10px] text-gray-400 mb-1">Opções (uma por linha)</label>
+                            <textarea
+                                rows={3}
+                                value={(field.options ?? []).join("\n")}
+                                onChange={(e) =>
+                                    updateField(idx, {
+                                        options: e.target.value.split("\n").map((s) => s.trim()).filter(Boolean),
+                                    })
+                                }
+                                placeholder="Tamanho errado\nProduto danificado\nArrependi-me"
+                                className="w-full px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-xs resize-none focus:outline-none focus:ring-1 focus:ring-purple-500"
+                            />
+                        </div>
+                    )}
+                    <div className="flex items-center justify-between">
+                        <label className="flex items-center gap-2 cursor-pointer select-none">
+                            <input
+                                type="checkbox"
+                                checked={field.required}
+                                onChange={(e) => updateField(idx, { required: e.target.checked })}
+                                className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                            />
+                            <span className="text-xs text-gray-500">Campo obrigatório</span>
+                        </label>
+                        <button type="button" onClick={() => removeField(idx)}
+                            className="text-xs text-red-400 hover:text-red-600 flex items-center gap-1">
+                            <MinusCircle size={13} /> Remover campo
+                        </button>
+                    </div>
+                </div>
+            ))}
+            <button type="button" onClick={addField}
+                className="flex items-center gap-1.5 text-xs text-purple-600 hover:text-purple-700 dark:text-purple-400">
+                <PlusCircle size={14} /> Adicionar campo
+            </button>
+        </div>
+    );
+}
+
+// ── Editor visual de categorias e campos extra ─────────────────
 function FormConfigEditor({ site }: { site: Site }) {
     const [open, setOpen] = useState(false);
 
-    // Estado local para categorias
     const initCategories = (): string[] => {
         if (!site.categories_json) return [];
         try { return JSON.parse(site.categories_json); } catch { return []; }
@@ -266,46 +368,38 @@ function FormConfigEditor({ site }: { site: Site }) {
     const [newCat, setNewCat]          = useState("");
     const [openCat, setOpenCat]        = useState<string | null>(null);
 
+    // campos globais (categoria reservada)
+    const globalFields: ExtraField[] =
+        extraRules.find((r) => r.category === GLOBAL_CATEGORY)?.fields ?? [];
+    const setGlobalFields = (fields: ExtraField[]) => {
+        setExtraRules((prev) => {
+            const filtered = prev.filter((r) => r.category !== GLOBAL_CATEGORY);
+            return fields.length > 0 ? [{ category: GLOBAL_CATEGORY, fields }, ...filtered] : filtered;
+        });
+    };
+
     const addCategory = () => {
         const name = newCat.trim();
         if (!name || categories.includes(name)) return;
         setCategories((prev) => [...prev, name]);
         setNewCat("");
     };
-
     const removeCategory = (cat: string) => {
         setCategories((prev) => prev.filter((c) => c !== cat));
         setExtraRules((prev) => prev.filter((r) => r.category !== cat));
         if (openCat === cat) setOpenCat(null);
     };
-
-    const getFields = (cat: string): ExtraField[] =>
+    const getCatFields = (cat: string): ExtraField[] =>
         extraRules.find((r) => r.category === cat)?.fields ?? [];
-
-    const setFields = (cat: string, fields: ExtraField[]) => {
+    const setCatFields = (cat: string, fields: ExtraField[]) => {
         setExtraRules((prev) => {
             const filtered = prev.filter((r) => r.category !== cat);
             return fields.length > 0 ? [...filtered, { category: cat, fields }] : filtered;
         });
     };
 
-    const addField = (cat: string) => {
-        const fields = getFields(cat);
-        setFields(cat, [...fields, { name: "", label: "", type: "text", required: false }]);
-    };
-
-    const removeField = (cat: string, idx: number) => {
-        const fields = getFields(cat).filter((_, i) => i !== idx);
-        setFields(cat, fields);
-    };
-
-    const updateField = (cat: string, idx: number, patch: Partial<ExtraField>) => {
-        const fields = getFields(cat).map((f, i) => i === idx ? { ...f, ...patch } : f);
-        setFields(cat, fields);
-    };
-
-    const categoriesJson  = categories.length  > 0 ? JSON.stringify(categories)  : "";
-    const extraFieldsJson = extraRules.length   > 0 ? JSON.stringify(extraRules)  : "";
+    const categoriesJson  = categories.length > 0 ? JSON.stringify(categories)  : "";
+    const extraFieldsJson = extraRules.length  > 0 ? JSON.stringify(extraRules)  : "";
 
     return (
         <>
@@ -325,13 +419,26 @@ function FormConfigEditor({ site }: { site: Site }) {
                         <div className="flex items-center justify-between mb-5">
                             <div>
                                 <h3 className="font-semibold">Formulário — {site.name}</h3>
-                                <p className="text-xs text-gray-400 mt-0.5">Categorias e campos extras por categoria</p>
+                                <p className="text-xs text-gray-400 mt-0.5">Campos globais, categorias e campos por categoria</p>
                             </div>
                             <button type="button" onClick={() => setOpen(false)}
                                 className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
                         </div>
 
-                        {/* Lista de categorias */}
+                        {/* ── Campos globais ── */}
+                        <div className="mb-6">
+                            <div className="flex items-center gap-2 mb-3">
+                                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Campos globais</p>
+                                <span className="text-[10px] bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 rounded-full px-2 py-0.5">
+                                    aparecem sempre, antes da descrição
+                                </span>
+                            </div>
+                            <FieldsEditor fields={globalFields} onChange={setGlobalFields} />
+                        </div>
+
+                        <div className="border-t border-gray-100 dark:border-gray-800 mb-5" />
+
+                        {/* ── Categorias ── */}
                         <div className="mb-5">
                             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Categorias</p>
 
@@ -348,11 +455,13 @@ function FormConfigEditor({ site }: { site: Site }) {
                                             <button type="button"
                                                 onClick={() => setOpenCat(openCat === cat ? null : cat)}
                                                 className="flex-1 flex items-center gap-2 text-sm text-left font-medium">
-                                                {openCat === cat ? <ChevronUp size={14} className="text-gray-400" /> : <ChevronDown size={14} className="text-gray-400" />}
+                                                {openCat === cat
+                                                    ? <ChevronUp size={14} className="text-gray-400" />
+                                                    : <ChevronDown size={14} className="text-gray-400" />}
                                                 {cat}
-                                                {getFields(cat).length > 0 && (
+                                                {getCatFields(cat).length > 0 && (
                                                     <span className="text-[10px] bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 rounded-full px-2 py-0.5">
-                                                        {getFields(cat).length} campo{getFields(cat).length !== 1 ? "s" : ""} extra
+                                                        {getCatFields(cat).length} campo{getCatFields(cat).length !== 1 ? "s" : ""} extra
                                                     </span>
                                                 )}
                                             </button>
@@ -362,97 +471,19 @@ function FormConfigEditor({ site }: { site: Site }) {
                                             </button>
                                         </div>
 
-                                        {/* Editor de campos extra desta categoria */}
                                         {openCat === cat && (
-                                            <div className="ml-4 mt-2 mb-3 space-y-3 border-l-2 border-purple-100 dark:border-purple-900 pl-4">
-                                                <p className="text-[11px] text-gray-400">Campos extra que aparecem quando o utilizador seleciona «{cat}»</p>
-
-                                                {getFields(cat).map((field, idx) => (
-                                                    <div key={idx} className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 space-y-2">
-                                                        <div className="grid grid-cols-2 gap-2">
-                                                            <div>
-                                                                <label className="block text-[10px] text-gray-400 mb-1">Nome interno (sem espaços)</label>
-                                                                <input
-                                                                    value={field.name}
-                                                                    onChange={(e) => updateField(cat, idx, { name: e.target.value.replace(/\s/g, "") })}
-                                                                    placeholder="orderNumber"
-                                                                    className="w-full px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
-                                                                />
-                                                            </div>
-                                                            <div>
-                                                                <label className="block text-[10px] text-gray-400 mb-1">Label visível</label>
-                                                                <input
-                                                                    value={field.label}
-                                                                    onChange={(e) => updateField(cat, idx, { label: e.target.value })}
-                                                                    placeholder="Nº de Encomenda"
-                                                                    className="w-full px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                        <div className="grid grid-cols-2 gap-2">
-                                                            <div>
-                                                                <label className="block text-[10px] text-gray-400 mb-1">Placeholder (opcional)</label>
-                                                                <input
-                                                                    value={field.placeholder ?? ""}
-                                                                    onChange={(e) => updateField(cat, idx, { placeholder: e.target.value })}
-                                                                    placeholder="ex: #1234"
-                                                                    className="w-full px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
-                                                                />
-                                                            </div>
-                                                            <div>
-                                                                <label className="block text-[10px] text-gray-400 mb-1">Tipo</label>
-                                                                <select
-                                                                    value={field.type}
-                                                                    onChange={(e) => updateField(cat, idx, { type: e.target.value as ExtraField["type"] })}
-                                                                    className="w-full px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
-                                                                >
-                                                                    <option value="text">Texto</option>
-                                                                    <option value="number">Número</option>
-                                                                    <option value="select">Seleção (dropdown)</option>
-                                                                </select>
-                                                            </div>
-                                                        </div>
-                                                        {field.type === "select" && (
-                                                            <div>
-                                                                <label className="block text-[10px] text-gray-400 mb-1">Opções (uma por linha)</label>
-                                                                <textarea
-                                                                    rows={3}
-                                                                    value={(field.options ?? []).join("\n")}
-                                                                    onChange={(e) => updateField(cat, idx, { options: e.target.value.split("\n").map((s) => s.trim()).filter(Boolean) })}
-                                                                    placeholder="Tamanho errado\nProduto danificado\nArrependi-me"
-                                                                    className="w-full px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-xs resize-none focus:outline-none focus:ring-1 focus:ring-purple-500"
-                                                                />
-                                                            </div>
-                                                        )}
-                                                        <div className="flex items-center justify-between">
-                                                            <label className="flex items-center gap-2 cursor-pointer select-none">
-                                                                <input
-                                                                    type="checkbox"
-                                                                    checked={field.required}
-                                                                    onChange={(e) => updateField(cat, idx, { required: e.target.checked })}
-                                                                    className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                                                                />
-                                                                <span className="text-xs text-gray-500">Campo obrigatório</span>
-                                                            </label>
-                                                            <button type="button" onClick={() => removeField(cat, idx)}
-                                                                className="text-xs text-red-400 hover:text-red-600 flex items-center gap-1">
-                                                                <MinusCircle size={13} /> Remover campo
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                ))}
-
-                                                <button type="button" onClick={() => addField(cat)}
-                                                    className="flex items-center gap-1.5 text-xs text-purple-600 hover:text-purple-700 dark:text-purple-400">
-                                                    <PlusCircle size={14} /> Adicionar campo extra
-                                                </button>
+                                            <div className="ml-4 mt-2 mb-3 border-l-2 border-purple-100 dark:border-purple-900 pl-4">
+                                                <p className="text-[11px] text-gray-400 mb-3">Campos extra que aparecem quando o utilizador seleciona «{cat}»</p>
+                                                <FieldsEditor
+                                                    fields={getCatFields(cat)}
+                                                    onChange={(fields) => setCatFields(cat, fields)}
+                                                />
                                             </div>
                                         )}
                                     </div>
                                 ))}
                             </div>
 
-                            {/* Adicionar nova categoria */}
                             <div className="flex gap-2">
                                 <input
                                     value={newCat}
@@ -468,7 +499,7 @@ function FormConfigEditor({ site }: { site: Site }) {
                             </div>
                         </div>
 
-                        {/* Guardar via Form oculto */}
+                        {/* Guardar */}
                         <Form method="post" className="mt-4 border-t border-gray-100 dark:border-gray-800 pt-4">
                             <input type="hidden" name="intent"          value="updateFormConfig" />
                             <input type="hidden" name="id"              value={site.id} />
@@ -492,7 +523,7 @@ function FormConfigEditor({ site }: { site: Site }) {
     );
 }
 
-// ── SiteRow ─────────────────────────────────────────────────────
+// ── SiteRow ────────────────────────────────────────────────────
 function SiteRow({
     site, baseUrl,
 }: {
@@ -539,8 +570,6 @@ function SiteRow({
                 <td className="px-6 py-4">
                     <div className="flex items-center justify-end gap-3">
                         <EmbedSnippet token={site.token} baseUrl={baseUrl} />
-
-                        {/* ★ Novo botão de configuração do formulário */}
                         <FormConfigEditor site={site} />
 
                         <button type="button" onClick={() => setEditing((v) => !v)}
@@ -618,7 +647,7 @@ function SiteRow({
     );
 }
 
-// ── Página principal ────────────────────────────────────────────
+// ── Página principal ───────────────────────────────────────────
 export default function AdminClients() {
     const { sites } = useLoaderData<typeof loader>();
     const result    = useActionData<typeof action>();

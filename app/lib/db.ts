@@ -12,7 +12,7 @@ export interface ClientUser {
     created_at: string;
 }
 
-/** Campo extra configurável por categoria num site. */
+/** Campo extra configurável num site. */
 export interface ExtraField {
     name: string;           // nome do input HTML  (ex: "orderNumber")
     label: string;          // label visível       (ex: "Nº de Encomenda")
@@ -22,11 +22,18 @@ export interface ExtraField {
     options?: string[];     // só para type === "select"
 }
 
-/** Regra de campos extra associada a uma categoria. */
+/**
+ * Regra de campos extra.
+ * category === "__global__" → campos que aparecem sempre,
+ *                              independentemente da categoria seleccionada.
+ */
 export interface CategoryExtraFields {
     category: string;
     fields: ExtraField[];
 }
+
+/** Categoria reservada para campos globais. */
+export const GLOBAL_CATEGORY = "__global__";
 
 export interface Site {
     id: number;
@@ -41,7 +48,11 @@ export interface Site {
     from_name: string | null;
     /** JSON array de strings com as categorias deste site. NULL = usar fallback genérico. */
     categories_json: string | null;
-    /** JSON array de CategoryExtraFields. NULL = sem campos extra. */
+    /**
+     * JSON array de CategoryExtraFields.
+     * Inclui a entrada especial { category: "__global__", fields: [...] }
+     * para campos que aparecem sempre.
+     */
     extra_fields_json: string | null;
     created_at: string;
 }
@@ -60,6 +71,17 @@ export function parseSiteCategories(site: Site): string[] {
         "Retificação / Eliminação de dados",
         "Outro",
     ];
+}
+
+/** Devolve os campos globais do site (aparecem sempre, antes da descrição). */
+export function parseSiteGlobalFields(site: Site): ExtraField[] {
+    if (!site.extra_fields_json) return [];
+    try {
+        const rules = JSON.parse(site.extra_fields_json) as CategoryExtraFields[];
+        return rules.find((r) => r.category === GLOBAL_CATEGORY)?.fields ?? [];
+    } catch {
+        return [];
+    }
 }
 
 /** Devolve os campos extra para uma determinada categoria (pode ser []). */
@@ -249,11 +271,11 @@ export async function updateSite(
 ): Promise<void> {
     const sets: string[] = ["name = ?", "domain = ?"];
     const vals: (string | number | null)[] = [data.name, data.domain];
-    if (data.brandColor     !== undefined) { sets.push("brand_color = ?");       vals.push(data.brandColor); }
-    if (data.logoR2Key      !== undefined) { sets.push("logo_r2_key = ?");        vals.push(data.logoR2Key); }
-    if (data.fromName       !== undefined) { sets.push("from_name = ?");          vals.push(data.fromName); }
-    if (data.categoriesJson !== undefined) { sets.push("categories_json = ?");   vals.push(data.categoriesJson); }
-    if (data.extraFieldsJson !== undefined){ sets.push("extra_fields_json = ?"); vals.push(data.extraFieldsJson); }
+    if (data.brandColor      !== undefined) { sets.push("brand_color = ?");       vals.push(data.brandColor); }
+    if (data.logoR2Key       !== undefined) { sets.push("logo_r2_key = ?");        vals.push(data.logoR2Key); }
+    if (data.fromName        !== undefined) { sets.push("from_name = ?");          vals.push(data.fromName); }
+    if (data.categoriesJson  !== undefined) { sets.push("categories_json = ?");   vals.push(data.categoriesJson); }
+    if (data.extraFieldsJson !== undefined) { sets.push("extra_fields_json = ?"); vals.push(data.extraFieldsJson); }
     vals.push(id);
     await db.prepare(`UPDATE sites SET ${sets.join(", ")} WHERE id = ?`).bind(...vals).run();
 }

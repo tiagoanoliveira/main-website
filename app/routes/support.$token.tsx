@@ -3,7 +3,8 @@ import { data, redirect, useLoaderData, useActionData, Form, useNavigation } fro
 import type { Route } from "./+types/support.$token";
 import {
     getSiteByToken, createTicket, createAttachment,
-    parseSiteCategories, parseSiteExtraFields,
+    parseSiteCategories, parseSiteGlobalFields, parseSiteExtraFields,
+    GLOBAL_CATEGORY,
 } from "~/lib/db";
 import type { ExtraField, CategoryExtraFields } from "~/lib/db";
 import { sendTicketConfirmation, sendAdminNotification } from "~/lib/email";
@@ -16,13 +17,19 @@ export async function loader({ params, context }: Route.LoaderArgs) {
     const site = await getSiteByToken(db, params.token);
     if (!site) throw data("Site não encontrado", { status: 404 });
 
-    const categories  = parseSiteCategories(site);
-    // Envia todas as regras de campos extra para o cliente (para reatividade sem round-trip)
+    const categories   = parseSiteCategories(site);
+    const globalFields = parseSiteGlobalFields(site);
     const extraRules: CategoryExtraFields[] = site.extra_fields_json
-        ? (() => { try { return JSON.parse(site.extra_fields_json); } catch { return []; } })()
+        ? (() => {
+              try {
+                  // Filtra a entrada global para não a expor duplicada
+                  const all = JSON.parse(site.extra_fields_json) as CategoryExtraFields[];
+                  return all.filter((r) => r.category !== GLOBAL_CATEGORY);
+              } catch { return []; }
+          })()
         : [];
 
-    return { site, categories, extraRules };
+    return { site, categories, globalFields, extraRules };
 }
 
 export async function action({ params, request, context }: Route.ActionArgs) {
@@ -39,15 +46,27 @@ export async function action({ params, request, context }: Route.ActionArgs) {
     const description = String(form.get("description") || "").trim();
 
     const errors: Record<string, string> = {};
-    if (!clientName)                                errors.clientName  = "O nome é obrigatório.";
-    if (!clientEmail || !clientEmail.includes("@"))  errors.clientEmail = "Email inválido.";
-    if (!category)                                  errors.category    = "Seleciona uma categoria.";
-    if (description.length < 10)                    errors.description = "Descreve o problema com mais detalhe (mínimo 10 caracteres).";
+    if (!clientName)                               errors.clientName  = "O nome é obrigatório.";
+    if (!clientEmail || !clientEmail.includes("@")) errors.clientEmail = "Email inválido.";
+    if (!category)                                 errors.category    = "Seleciona uma categoria.";
+    if (description.length < 10)                   errors.description = "Descreve o problema com mais detalhe (mínimo 10 caracteres).";
 
-    // Validar campos extra obrigatórios
-    const extraFields = parseSiteExtraFields(site, category);
     const extraData: Record<string, string> = {};
-    for (const field of extraFields) {
+
+    // Validar campos globais
+    const globalFields = parseSiteGlobalFields(site);
+    for (const field of globalFields) {
+        const val = String(form.get(`extra_${field.name}`) || "").trim();
+        if (field.required && !val) {
+            errors[`extra_${field.name}`] = `${field.label} é obrigatório.`;
+        } else if (val) {
+            extraData[field.name] = val;
+        }
+    }
+
+    // Validar campos extra da categoria
+    const categoryFields = parseSiteExtraFields(site, category);
+    for (const field of categoryFields) {
         const val = String(form.get(`extra_${field.name}`) || "").trim();
         if (field.required && !val) {
             errors[`extra_${field.name}`] = `${field.label} é obrigatório.`;
@@ -117,19 +136,17 @@ function useIframeResizer() {
     }, []);
 }
 
-// ── Campo extra dinâmico ────────────────────────────────────────
+// ── Campo dinâmico ────────────────────────────────────────────────────────
 function DynamicField({
-    field,
-    error,
-    brandColor,
+    field, error, brandColor,
 }: {
     field: ExtraField;
     error?: string;
     brandColor: string;
 }) {
     const base =
-        `w-full px-3 py-2.5 rounded-xl border text-sm bg-white dark:bg-gray-800 ` +
-        `focus:outline-none focus:ring-2 transition-colors `;
+        "w-full px-3 py-2.5 rounded-xl border text-sm bg-white dark:bg-gray-800 " +
+        "focus:outline-none focus:ring-2 transition-colors ";
     const borderClass = error
         ? "border-red-400 dark:border-red-600"
         : "border-gray-300 dark:border-gray-700";
@@ -170,9 +187,9 @@ function DynamicField({
     );
 }
 
-// ── Página principal ────────────────────────────────────────────
+// ── Página principal ──────────────────────────────────────────────────────
 export default function SupportForm() {
-    const { site, categories, extraRules } = useLoaderData<typeof loader>();
+    const { site, categories, globalFields, extraRules } = useLoaderData<typeof loader>();
     const result     = useActionData<typeof action>();
     const navigation = useNavigation();
     const isLoading  = navigation.state === "submitting";
@@ -181,8 +198,7 @@ export default function SupportForm() {
     const [selectedCategory, setSelectedCategory] = useState("");
     const brandColor = site.brand_color ?? "#2563eb";
 
-    // Campos extra correspondentes à categoria seleccionada
-    const activeExtraFields: ExtraField[] =
+    const activeCategoryFields: ExtraField[] =
         extraRules.find((r) => r.category === selectedCategory)?.fields ?? [];
 
     useIframeResizer();
@@ -233,6 +249,20 @@ export default function SupportForm() {
                             {errors.clientEmail && <p className="text-xs text-red-500 mt-1">{errors.clientEmail}</p>}
                         </div>
 
+                        {/* Campos globais — aparecem sempre, antes da descrição */}
+                        {globalFields.length > 0 && (
+                            <div className="space-y-4 rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/40 p-4">
+                                {globalFields.map((field) => (
+                                    <DynamicField
+                                        key={field.name}
+                                        field={field}
+                                        error={errors[`extra_${field.name}`]}
+                                        brandColor={brandColor}
+                                    />
+                                ))}
+                            </div>
+                        )}
+
                         {/* Categoria */}
                         <div>
                             <label className="block text-sm font-medium mb-1.5">Categoria <span className="text-red-500">*</span></label>
@@ -249,10 +279,10 @@ export default function SupportForm() {
                             {errors.category && <p className="text-xs text-red-500 mt-1">{errors.category}</p>}
                         </div>
 
-                        {/* Campos extra dinâmicos — aparecem ao seleccionar categoria */}
-                        {activeExtraFields.length > 0 && (
+                        {/* Campos extra da categoria seleccionada */}
+                        {activeCategoryFields.length > 0 && (
                             <div className="space-y-4 rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/40 p-4">
-                                {activeExtraFields.map((field) => (
+                                {activeCategoryFields.map((field) => (
                                     <DynamicField
                                         key={field.name}
                                         field={field}
