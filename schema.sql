@@ -12,14 +12,22 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 CREATE TABLE IF NOT EXISTS sites (
-    id           INTEGER  PRIMARY KEY AUTOINCREMENT,
-    name         TEXT     NOT NULL,
-    domain       TEXT     NOT NULL,
-    token        TEXT     NOT NULL UNIQUE,
-    owner_id     INTEGER  REFERENCES users(id),
-    brand_color  TEXT     DEFAULT '#2563eb',
-    logo_r2_key  TEXT     DEFAULT NULL,
-    created_at   DATETIME DEFAULT CURRENT_TIMESTAMP
+    id                 INTEGER  PRIMARY KEY AUTOINCREMENT,
+    name               TEXT     NOT NULL,
+    domain             TEXT     NOT NULL,
+    token              TEXT     NOT NULL UNIQUE,
+    owner_id           INTEGER  REFERENCES users(id),
+    brand_color        TEXT     DEFAULT '#2563eb',
+    logo_r2_key        TEXT     DEFAULT NULL,
+    from_name          TEXT     DEFAULT NULL,
+    -- JSON array de strings ex: '["Encomenda","Devolução","Outro"]'
+    -- NULL = usar categorias genéricas do formulário
+    categories_json    TEXT     DEFAULT NULL,
+    -- JSON array de objectos por categoria:
+    -- [{ "category": "Encomenda", "fields": [{ "name": "orderNumber", "label": "Nº Encomenda", "type": "text", "required": true }] }]
+    -- Tipos suportados: "text" | "number" | "select" (select requer campo "options": string[])
+    extra_fields_json  TEXT     DEFAULT NULL,
+    created_at         DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS tickets (
@@ -27,9 +35,11 @@ CREATE TABLE IF NOT EXISTS tickets (
     site_id      INTEGER  REFERENCES sites(id),
     client_name  TEXT     NOT NULL,
     client_email TEXT     NOT NULL,
-    client_phone TEXT     DEFAULT NULL,   -- adicionado em migration 0004
+    client_phone TEXT     DEFAULT NULL,
     category     TEXT     NOT NULL,
     description  TEXT     NOT NULL,
+    -- Campos extra submetidos como JSON ex: {"orderNumber":"#1234","returnReason":"Tamanho errado"}
+    extra_data   TEXT     DEFAULT NULL,
     status       TEXT     NOT NULL DEFAULT 'open',
     public_token TEXT     UNIQUE,
     created_at   DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -73,42 +83,42 @@ CREATE TABLE IF NOT EXISTS attachments (
     created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- ── Projetos ───────────────────────────────────────────────────
+-- ── Projetos ───────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS projects (
-                                        id               INTEGER  PRIMARY KEY AUTOINCREMENT,
-                                        slug             TEXT     NOT NULL UNIQUE,          -- URL amigável (ex: "barbearia-brooklyn")
-                                        title            TEXT     NOT NULL,
-                                        category         TEXT     NOT NULL,
-                                        order_index      INTEGER  NOT NULL DEFAULT 0,       -- índice para ordenação "mais relevante"
-                                        summary          TEXT     NOT NULL,                 -- texto curto (cards e listagem)
-                                        description      TEXT     NOT NULL DEFAULT '',      -- descrição completa (página de detalhe)
-                                        link             TEXT     DEFAULT NULL,             -- URL externo, se existir
-                                        cover_image_key  TEXT     DEFAULT NULL,             -- R2 key imagem de capa
-                                        image_1_key      TEXT     DEFAULT NULL,             -- R2 key imagem extra 1
-                                        image_2_key      TEXT     DEFAULT NULL,
-                                        image_3_key      TEXT     DEFAULT NULL,
-                                        tags             TEXT     NOT NULL DEFAULT '[]',    -- JSON array ex: '["React","D1"]'
-                                        completed_at     DATE     DEFAULT NULL,
-                                        complexity       INTEGER  NOT NULL DEFAULT 1
-                                        CHECK(complexity BETWEEN 1 AND 5),
+    id               INTEGER  PRIMARY KEY AUTOINCREMENT,
+    slug             TEXT     NOT NULL UNIQUE,
+    title            TEXT     NOT NULL,
+    category         TEXT     NOT NULL,
+    order_index      INTEGER  NOT NULL DEFAULT 0,
+    summary          TEXT     NOT NULL,
+    description      TEXT     NOT NULL DEFAULT '',
+    link             TEXT     DEFAULT NULL,
+    cover_image_key  TEXT     DEFAULT NULL,
+    image_1_key      TEXT     DEFAULT NULL,
+    image_2_key      TEXT     DEFAULT NULL,
+    image_3_key      TEXT     DEFAULT NULL,
+    tags             TEXT     NOT NULL DEFAULT '[]',
+    completed_at     DATE     DEFAULT NULL,
+    complexity       INTEGER  NOT NULL DEFAULT 1
+                     CHECK(complexity BETWEEN 1 AND 5),
     is_published     INTEGER  NOT NULL DEFAULT 1,
+    logo_r2_key      TEXT     DEFAULT NULL,
     created_at       DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at       DATETIME DEFAULT CURRENT_TIMESTAMP
-    logo_r2_key TEXT DEFAULT NULL;
-    );
+);
 
 CREATE INDEX IF NOT EXISTS idx_projects_order      ON projects(order_index);
 CREATE INDEX IF NOT EXISTS idx_projects_category   ON projects(category);
 CREATE INDEX IF NOT EXISTS idx_projects_published  ON projects(is_published);
 CREATE INDEX IF NOT EXISTS idx_projects_completed  ON projects(completed_at);
 CREATE INDEX IF NOT EXISTS idx_projects_complexity ON projects(complexity);
-CREATE INDEX IF NOT EXISTS idx_projects_logo ON projects(logo_r2_key);
+CREATE INDEX IF NOT EXISTS idx_projects_logo       ON projects(logo_r2_key);
 
--- ── Índices ────────────────────────────────────────────────────
-CREATE INDEX IF NOT EXISTS idx_attachments_entity    ON attachments(entity_type, entity_id);
-CREATE INDEX IF NOT EXISTS idx_invoices_site         ON invoices(site_id);
-CREATE INDEX IF NOT EXISTS idx_invoices_status       ON invoices(status);
-CREATE INDEX IF NOT EXISTS idx_users_reset_token     ON users(reset_token);
-CREATE INDEX IF NOT EXISTS idx_tickets_public_token  ON tickets(public_token);
-CREATE INDEX IF NOT EXISTS idx_tickets_client_email  ON tickets(client_email);
+-- ── Índices ────────────────────────────────────────────────────────────────────
+CREATE INDEX IF NOT EXISTS idx_attachments_entity     ON attachments(entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_invoices_site          ON invoices(site_id);
+CREATE INDEX IF NOT EXISTS idx_invoices_status        ON invoices(status);
+CREATE INDEX IF NOT EXISTS idx_users_reset_token      ON users(reset_token);
+CREATE INDEX IF NOT EXISTS idx_tickets_public_token   ON tickets(public_token);
+CREATE INDEX IF NOT EXISTS idx_tickets_client_email   ON tickets(client_email);
 CREATE INDEX IF NOT EXISTS idx_ticket_messages_ticket ON ticket_messages(ticket_id);

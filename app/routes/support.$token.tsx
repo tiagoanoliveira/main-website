@@ -1,28 +1,28 @@
 // app/routes/support.$token.tsx
 import { data, redirect, useLoaderData, useActionData, Form, useNavigation } from "react-router";
 import type { Route } from "./+types/support.$token";
-import { getSiteByToken, createTicket, createAttachment } from "~/lib/db";
+import {
+    getSiteByToken, createTicket, createAttachment,
+    parseSiteCategories, parseSiteExtraFields,
+} from "~/lib/db";
+import type { ExtraField, CategoryExtraFields } from "~/lib/db";
 import { sendTicketConfirmation, sendAdminNotification } from "~/lib/email";
 import { uploadFile, buildR2Key } from "~/lib/storage";
 import { Loader2, Paperclip } from "lucide-react";
-import { useEffect } from "react";
-
-const CATEGORIES = [
-    "Dúvida geral",
-    "Acesso / Login",
-    "Problema técnico",
-    "Problema com reserva",
-    "Sugestão de melhoria",
-    "Agradecimento",
-    "Retificação / Eliminação de dados",
-    "Outro",
-];
+import { useEffect, useState } from "react";
 
 export async function loader({ params, context }: Route.LoaderArgs) {
     const db   = context.cloudflare.env.DB;
     const site = await getSiteByToken(db, params.token);
     if (!site) throw data("Site não encontrado", { status: 404 });
-    return { site };
+
+    const categories  = parseSiteCategories(site);
+    // Envia todas as regras de campos extra para o cliente (para reatividade sem round-trip)
+    const extraRules: CategoryExtraFields[] = site.extra_fields_json
+        ? (() => { try { return JSON.parse(site.extra_fields_json); } catch { return []; } })()
+        : [];
+
+    return { site, categories, extraRules };
 }
 
 export async function action({ params, request, context }: Route.ActionArgs) {
@@ -39,14 +39,28 @@ export async function action({ params, request, context }: Route.ActionArgs) {
     const description = String(form.get("description") || "").trim();
 
     const errors: Record<string, string> = {};
-    if (!clientName)                               errors.clientName  = "O nome é obrigatório.";
-    if (!clientEmail || !clientEmail.includes("@")) errors.clientEmail = "Email inválido.";
-    if (!category)                                 errors.category    = "Seleciona uma categoria.";
-    if (description.length < 10)                   errors.description = "Descreve o problema com mais detalhe (mínimo 10 caracteres).";
+    if (!clientName)                                errors.clientName  = "O nome é obrigatório.";
+    if (!clientEmail || !clientEmail.includes("@"))  errors.clientEmail = "Email inválido.";
+    if (!category)                                  errors.category    = "Seleciona uma categoria.";
+    if (description.length < 10)                    errors.description = "Descreve o problema com mais detalhe (mínimo 10 caracteres).";
+
+    // Validar campos extra obrigatórios
+    const extraFields = parseSiteExtraFields(site, category);
+    const extraData: Record<string, string> = {};
+    for (const field of extraFields) {
+        const val = String(form.get(`extra_${field.name}`) || "").trim();
+        if (field.required && !val) {
+            errors[`extra_${field.name}`] = `${field.label} é obrigatório.`;
+        } else if (val) {
+            extraData[field.name] = val;
+        }
+    }
+
     if (Object.keys(errors).length > 0) return data({ errors }, { status: 400 });
 
     const { id, publicToken } = await createTicket(db, {
         siteId: site.id, clientName, clientEmail, clientPhone, category, description,
+        extraData: Object.keys(extraData).length > 0 ? extraData : null,
     });
 
     const files = form.getAll("files") as File[];
@@ -62,7 +76,6 @@ export async function action({ params, request, context }: Route.ActionArgs) {
         } catch (err) { console.error("[upload] erro:", err); }
     }
 
-    // FROM: "Nome do Site <email@verificado.pt>" ou apenas o email global
     const from = site.from_name
         ? `${site.from_name} <${env.FROM_EMAIL}>`
         : env.FROM_EMAIL;
@@ -74,9 +87,7 @@ export async function action({ params, request, context }: Route.ActionArgs) {
                 to: clientEmail, clientName, ticketId: id, category, description, publicToken,
                 baseUrl: env.BASE_URL,
             });
-        } catch (err) {
-            console.error("[email] erro ao enviar confirmação ao cliente:", err);
-        }
+        } catch (err) { console.error("[email] confirmação:", err); }
 
         if (env.ADMIN_EMAIL) {
             try {
@@ -86,9 +97,7 @@ export async function action({ params, request, context }: Route.ActionArgs) {
                     clientName, ticketId: id, message: description,
                     baseUrl: env.BASE_URL, isNewTicket: true, category,
                 });
-            } catch (err) {
-                console.error("[email] erro ao notificar admin:", err);
-            }
+            } catch (err) { console.error("[email] notificação admin:", err); }
         }
     }
 
@@ -108,12 +117,73 @@ function useIframeResizer() {
     }, []);
 }
 
+// ── Campo extra dinâmico ────────────────────────────────────────
+function DynamicField({
+    field,
+    error,
+    brandColor,
+}: {
+    field: ExtraField;
+    error?: string;
+    brandColor: string;
+}) {
+    const base =
+        `w-full px-3 py-2.5 rounded-xl border text-sm bg-white dark:bg-gray-800 ` +
+        `focus:outline-none focus:ring-2 transition-colors `;
+    const borderClass = error
+        ? "border-red-400 dark:border-red-600"
+        : "border-gray-300 dark:border-gray-700";
+
+    if (field.type === "select" && field.options?.length) {
+        return (
+            <div>
+                <label className="block text-sm font-medium mb-1.5">
+                    {field.label}{field.required && <span className="text-red-500 ml-0.5">*</span>}
+                </label>
+                <select
+                    name={`extra_${field.name}`}
+                    className={`${base}${borderClass}`}
+                    style={{ "--tw-ring-color": brandColor } as React.CSSProperties}
+                >
+                    <option value="">Seleciona uma opção…</option>
+                    {field.options.map((o) => <option key={o} value={o}>{o}</option>)}
+                </select>
+                {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+            </div>
+        );
+    }
+
+    return (
+        <div>
+            <label className="block text-sm font-medium mb-1.5">
+                {field.label}{field.required && <span className="text-red-500 ml-0.5">*</span>}
+            </label>
+            <input
+                name={`extra_${field.name}`}
+                type={field.type === "number" ? "number" : "text"}
+                placeholder={field.placeholder ?? ""}
+                className={`${base}${borderClass}`}
+                style={{ "--tw-ring-color": brandColor } as React.CSSProperties}
+            />
+            {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+        </div>
+    );
+}
+
+// ── Página principal ────────────────────────────────────────────
 export default function SupportForm() {
-    const { site }   = useLoaderData<typeof loader>();
+    const { site, categories, extraRules } = useLoaderData<typeof loader>();
     const result     = useActionData<typeof action>();
     const navigation = useNavigation();
     const isLoading  = navigation.state === "submitting";
     const errors     = result?.errors ?? {};
+
+    const [selectedCategory, setSelectedCategory] = useState("");
+    const brandColor = site.brand_color ?? "#2563eb";
+
+    // Campos extra correspondentes à categoria seleccionada
+    const activeExtraFields: ExtraField[] =
+        extraRules.find((r) => r.category === selectedCategory)?.fields ?? [];
 
     useIframeResizer();
 
@@ -123,7 +193,7 @@ export default function SupportForm() {
                 <div className="text-center mb-6">
                     <div
                         className="inline-flex items-center justify-center w-12 h-12 rounded-xl mb-3"
-                        style={{ backgroundColor: site.brand_color ?? "#2563eb" }}
+                        style={{ backgroundColor: brandColor }}
                     >
                         {site.logo_r2_key ? (
                             <img src={`/uploads/${site.logo_r2_key}`} alt={site.name} className="h-8 w-8 object-contain rounded-lg" />
@@ -138,49 +208,72 @@ export default function SupportForm() {
                 <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 py-6 px-4 shadow-sm">
                     <Form method="post" encType="multipart/form-data" className="space-y-4">
 
+                        {/* Nome + Telefone */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-sm font-medium mb-1.5">Nome <span className="text-red-500">*</span></label>
                                 <input name="clientName" autoComplete="name" placeholder="O teu nome"
-                                    className={`w-full px-3 py-2.5 rounded-xl border text-sm bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
+                                    className={`w-full px-3 py-2.5 rounded-xl border text-sm bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 transition-colors ${
                                         errors.clientName ? "border-red-400 dark:border-red-600" : "border-gray-300 dark:border-gray-700"}`} />
                                 {errors.clientName && <p className="text-xs text-red-500 mt-1">{errors.clientName}</p>}
                             </div>
                             <div>
                                 <label className="block text-sm font-medium mb-1.5">Telefone</label>
                                 <input name="clientPhone" type="tel" autoComplete="tel" placeholder="+351 9xx xxx xxx"
-                                    className="w-full px-3 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 text-sm bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors" />
+                                    className="w-full px-3 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 text-sm bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 transition-colors" />
                             </div>
                         </div>
 
+                        {/* Email */}
                         <div>
                             <label className="block text-sm font-medium mb-1.5">Email <span className="text-red-500">*</span></label>
                             <input name="clientEmail" type="email" autoComplete="email" placeholder="teu@email.com"
-                                className={`w-full px-3 py-2.5 rounded-xl border text-sm bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
+                                className={`w-full px-3 py-2.5 rounded-xl border text-sm bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 transition-colors ${
                                     errors.clientEmail ? "border-red-400 dark:border-red-600" : "border-gray-300 dark:border-gray-700"}`} />
                             {errors.clientEmail && <p className="text-xs text-red-500 mt-1">{errors.clientEmail}</p>}
                         </div>
 
+                        {/* Categoria */}
                         <div>
                             <label className="block text-sm font-medium mb-1.5">Categoria <span className="text-red-500">*</span></label>
-                            <select name="category"
-                                className={`w-full px-3 py-2.5 rounded-xl border text-sm bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
-                                    errors.category ? "border-red-400 dark:border-red-600" : "border-gray-300 dark:border-gray-700"}`}>
+                            <select
+                                name="category"
+                                value={selectedCategory}
+                                onChange={(e) => setSelectedCategory(e.target.value)}
+                                className={`w-full px-3 py-2.5 rounded-xl border text-sm bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 transition-colors ${
+                                    errors.category ? "border-red-400 dark:border-red-600" : "border-gray-300 dark:border-gray-700"}`}
+                            >
                                 <option value="">Seleciona uma categoria…</option>
-                                {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                                {categories.map((c) => <option key={c} value={c}>{c}</option>)}
                             </select>
                             {errors.category && <p className="text-xs text-red-500 mt-1">{errors.category}</p>}
                         </div>
 
+                        {/* Campos extra dinâmicos — aparecem ao seleccionar categoria */}
+                        {activeExtraFields.length > 0 && (
+                            <div className="space-y-4 rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/40 p-4">
+                                {activeExtraFields.map((field) => (
+                                    <DynamicField
+                                        key={field.name}
+                                        field={field}
+                                        error={errors[`extra_${field.name}`]}
+                                        brandColor={brandColor}
+                                    />
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Descrição */}
                         <div>
                             <label className="block text-sm font-medium mb-1.5">Descrição do problema <span className="text-red-500">*</span></label>
                             <textarea name="description" rows={4}
                                 placeholder="Descreve o problema com o máximo de detalhe possível…"
-                                className={`w-full px-3 py-3 rounded-xl border text-sm bg-white dark:bg-gray-800 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
+                                className={`w-full px-3 py-3 rounded-xl border text-sm bg-white dark:bg-gray-800 resize-none focus:outline-none focus:ring-2 transition-colors ${
                                     errors.description ? "border-red-400 dark:border-red-600" : "border-gray-300 dark:border-gray-700"}`} />
                             {errors.description && <p className="text-xs text-red-500 mt-1">{errors.description}</p>}
                         </div>
 
+                        {/* Anexos */}
                         <div>
                             <label className="flex items-center gap-1.5 text-sm font-medium mb-1.5">
                                 <Paperclip size={13} /> Anexos <span className="text-gray-400 font-normal">(opcional)</span>
@@ -191,7 +284,7 @@ export default function SupportForm() {
                         </div>
 
                         <button type="submit" disabled={isLoading}
-                            style={{ backgroundColor: isLoading ? undefined : (site.brand_color ?? "#2563eb") }}
+                            style={{ backgroundColor: isLoading ? undefined : brandColor }}
                             className="w-full py-3 disabled:opacity-60 text-white font-medium rounded-xl transition-opacity flex items-center justify-center gap-2 text-sm">
                             {isLoading ? <><Loader2 size={15} className="animate-spin" /> A enviar…</> : "Enviar Pedido de Suporte"}
                         </button>

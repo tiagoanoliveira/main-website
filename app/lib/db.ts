@@ -12,6 +12,22 @@ export interface ClientUser {
     created_at: string;
 }
 
+/** Campo extra configurável por categoria num site. */
+export interface ExtraField {
+    name: string;           // nome do input HTML  (ex: "orderNumber")
+    label: string;          // label visível       (ex: "Nº de Encomenda")
+    type: "text" | "number" | "select";
+    required: boolean;
+    placeholder?: string;
+    options?: string[];     // só para type === "select"
+}
+
+/** Regra de campos extra associada a uma categoria. */
+export interface CategoryExtraFields {
+    category: string;
+    fields: ExtraField[];
+}
+
 export interface Site {
     id: number;
     name: string;
@@ -22,10 +38,39 @@ export interface Site {
     owner_email: string | null;
     brand_color: string | null;
     logo_r2_key: string | null;
-    // Nome de exibição usado no campo FROM dos emails (ex: "Suporte Barbearia Brooklyn").
-    // O email real de envio é sempre o FROM_EMAIL global do Worker.
     from_name: string | null;
+    /** JSON array de strings com as categorias deste site. NULL = usar fallback genérico. */
+    categories_json: string | null;
+    /** JSON array de CategoryExtraFields. NULL = sem campos extra. */
+    extra_fields_json: string | null;
     created_at: string;
+}
+
+/** Devolve as categorias do site ou o array genérico de fallback. */
+export function parseSiteCategories(site: Site): string[] {
+    if (site.categories_json) {
+        try { return JSON.parse(site.categories_json) as string[]; } catch { /* fallback */ }
+    }
+    return [
+        "Dúvida geral",
+        "Acesso / Login",
+        "Problema técnico",
+        "Sugestão de melhoria",
+        "Agradecimento",
+        "Retificação / Eliminação de dados",
+        "Outro",
+    ];
+}
+
+/** Devolve os campos extra para uma determinada categoria (pode ser []). */
+export function parseSiteExtraFields(site: Site, category: string): ExtraField[] {
+    if (!site.extra_fields_json) return [];
+    try {
+        const rules = JSON.parse(site.extra_fields_json) as CategoryExtraFields[];
+        return rules.find((r) => r.category === category)?.fields ?? [];
+    } catch {
+        return [];
+    }
 }
 
 export interface Ticket {
@@ -38,6 +83,8 @@ export interface Ticket {
     client_phone: string | null;
     category: string;
     description: string;
+    /** JSON string com os campos extra submetidos pelo utilizador. */
+    extra_data: string | null;
     status: "open" | "in_progress" | "closed";
     public_token: string;
     created_at: string;
@@ -190,13 +237,23 @@ export async function createSiteWithOwner(
 export async function updateSite(
     db: D1Database,
     id: number,
-    data: { name: string; domain: string; brandColor?: string | null; logoR2Key?: string | null; fromName?: string | null }
+    data: {
+        name: string;
+        domain: string;
+        brandColor?: string | null;
+        logoR2Key?: string | null;
+        fromName?: string | null;
+        categoriesJson?: string | null;
+        extraFieldsJson?: string | null;
+    }
 ): Promise<void> {
     const sets: string[] = ["name = ?", "domain = ?"];
     const vals: (string | number | null)[] = [data.name, data.domain];
-    if (data.brandColor !== undefined) { sets.push("brand_color = ?"); vals.push(data.brandColor); }
-    if (data.logoR2Key  !== undefined) { sets.push("logo_r2_key = ?");  vals.push(data.logoR2Key); }
-    if (data.fromName   !== undefined) { sets.push("from_name = ?");    vals.push(data.fromName); }
+    if (data.brandColor     !== undefined) { sets.push("brand_color = ?");       vals.push(data.brandColor); }
+    if (data.logoR2Key      !== undefined) { sets.push("logo_r2_key = ?");        vals.push(data.logoR2Key); }
+    if (data.fromName       !== undefined) { sets.push("from_name = ?");          vals.push(data.fromName); }
+    if (data.categoriesJson !== undefined) { sets.push("categories_json = ?");   vals.push(data.categoriesJson); }
+    if (data.extraFieldsJson !== undefined){ sets.push("extra_fields_json = ?"); vals.push(data.extraFieldsJson); }
     vals.push(id);
     await db.prepare(`UPDATE sites SET ${sets.join(", ")} WHERE id = ?`).bind(...vals).run();
 }
@@ -273,15 +330,30 @@ export async function updateTicketStatus(db: D1Database, ticketId: number, statu
 
 export async function createTicket(
     db: D1Database,
-    data: { siteId: number; clientName: string; clientEmail: string; clientPhone?: string | null; category: string; description: string }
+    data: {
+        siteId: number;
+        clientName: string;
+        clientEmail: string;
+        clientPhone?: string | null;
+        category: string;
+        description: string;
+        extraData?: Record<string, string> | null;
+    }
 ): Promise<{ id: number; publicToken: string }> {
     const publicToken = crypto.randomUUID().replace(/-/g, "");
+    const extraDataJson = data.extraData && Object.keys(data.extraData).length > 0
+        ? JSON.stringify(data.extraData)
+        : null;
     const r = await db
         .prepare(
-            `INSERT INTO tickets (site_id, client_name, client_email, client_phone, category, description, public_token)
-             VALUES (?, ?, ?, ?, ?, ?, ?)`
+            `INSERT INTO tickets (site_id, client_name, client_email, client_phone, category, description, extra_data, public_token)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
         )
-        .bind(data.siteId, data.clientName, data.clientEmail, data.clientPhone ?? null, data.category, data.description, publicToken)
+        .bind(
+            data.siteId, data.clientName, data.clientEmail,
+            data.clientPhone ?? null, data.category, data.description,
+            extraDataJson, publicToken
+        )
         .run();
     return { id: Number(r.meta.last_row_id), publicToken };
 }
