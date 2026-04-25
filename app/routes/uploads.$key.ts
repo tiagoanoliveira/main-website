@@ -5,10 +5,19 @@ import { getSessionUser } from "~/lib/auth.server";
 
 export const unstable_path = "/uploads/*";
 
-// Prefixos de ficheiros públicos (sem autenticação necessária)
+/**
+ * Prefixos de ficheiros que não requerem autenticação.
+ *
+ * - projects/   → imagens de projectos (públicas)
+ * - clients/    → assets de clientes (públicos)
+ * - site_logo/  → logos dos sites usados no iframe de suporte
+ *                 (têm de ser públicos porque o iframe corre em domínios
+ *                  externos onde o cookie de sessão não é enviado)
+ */
 const PUBLIC_PREFIXES = [
     "projects/",
     "clients/",
+    "site_logo/",
 ];
 
 export async function loader({ request, params, context }: Route.LoaderArgs) {
@@ -41,6 +50,11 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
             ? "public, max-age=31536000, immutable"
             : "private, max-age=3600"
     );
+
+    // Permitir embedding em iframes de qualquer origem (necessário para o
+    // formulário de suporte integrado em sites de clientes)
+    headers.set("X-Frame-Options", "ALLOWALL");
+    headers.set("Access-Control-Allow-Origin", "*");
 
     return new Response(obj.body as ReadableStream, { headers });
 }
