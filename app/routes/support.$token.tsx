@@ -129,7 +129,6 @@ export async function action({ params, request, context }: Route.ActionArgs) {
 
         return redirect(`/support/${params.token}/success?${qs.toString()}`);
     } catch (err) {
-        // Re-throw Response/data errors (404s etc.)
         if (err instanceof Response) throw err;
         console.error("[support action] erro inesperado:", err);
         return data(
@@ -138,6 +137,25 @@ export async function action({ params, request, context }: Route.ActionArgs) {
         );
     }
 }
+
+// ── Read a search param synchronously (safe for SSR) ──────────────────
+function getSearchParam(name: string): string | null {
+    if (typeof window === "undefined") return null;
+    return new URLSearchParams(window.location.search).get(name);
+}
+
+// ── Apply ?theme= immediately to <html> before paint ─────────────────
+function applyTheme() {
+    if (typeof window === "undefined") return;
+    const theme = new URLSearchParams(window.location.search).get("theme");
+    if (theme === "light" || theme === "dark") {
+        document.documentElement.setAttribute("data-theme", theme);
+    } else {
+        document.documentElement.removeAttribute("data-theme");
+    }
+}
+// Run once immediately at module evaluation time so it fires before React paints
+if (typeof window !== "undefined") applyTheme();
 
 function useIframeResizer() {
     useEffect(() => {
@@ -152,22 +170,7 @@ function useIframeResizer() {
     }, []);
 }
 
-// ── Resolve theme from ?theme= param ─────────────────────────────────────
-// Accepted values: "light" | "dark" | "system" (default — follows device)
-function useThemeParam() {
-    useEffect(() => {
-        const params = new URLSearchParams(window.location.search);
-        const theme  = params.get("theme");
-        if (theme === "light" || theme === "dark") {
-            document.documentElement.setAttribute("data-theme", theme);
-        } else {
-            // "system" or any other value → remove override, let CSS media query decide
-            document.documentElement.removeAttribute("data-theme");
-        }
-    }, []);
-}
-
-// ── Campo dinâmico ────────────────────────────────────────────────────────
+// ── Campo dinâmico ────────────────────────────────────────────────────────────
 function DynamicField({
     field, error, brandColor,
 }: {
@@ -218,7 +221,7 @@ function DynamicField({
     );
 }
 
-// ── Página principal ──────────────────────────────────────────────────────
+// ── Página principal ────────────────────────────────────────────────────────────────
 export default function SupportForm() {
     const { site, categories, globalFields, extraRules } = useLoaderData<typeof loader>();
     const result     = useActionData<typeof action>();
@@ -233,16 +236,11 @@ export default function SupportForm() {
         extraRules.find((r) => r.category === selectedCategory)?.fields ?? [];
 
     useIframeResizer();
-    useThemeParam();
 
-    // Read ?bg= param (default: true — show background)
-    // Accepted values: "false" | "0" → no background; anything else → show background
-    const [showBg, setShowBg] = useState(true);
-    useEffect(() => {
-        const params = new URLSearchParams(window.location.search);
-        const bg = params.get("bg");
-        if (bg === "false" || bg === "0") setShowBg(false);
-    }, []);
+    // ── Read ?bg= synchronously so the value is correct on first render ──
+    // getSearchParam is safe for SSR (returns null server-side)
+    const bgParam = getSearchParam("bg");
+    const showBg  = bgParam !== "false" && bgParam !== "0";
 
     const wrapperClass = showBg
         ? "bg-gray-50 dark:bg-gray-950 px-4 py-8"
