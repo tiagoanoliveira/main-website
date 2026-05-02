@@ -1,13 +1,33 @@
 import { useSearchParams } from "react-router";
 import { motion } from "motion/react";
 import { CheckCircle } from "lucide-react";
+import { useEffect } from "react";
+
+function useThemeParam() {
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const theme  = params.get("theme");
+        if (theme === "light" || theme === "dark") {
+            document.documentElement.setAttribute("data-theme", theme);
+        } else {
+            document.documentElement.removeAttribute("data-theme");
+        }
+    }, []);
+}
 
 export default function SupportSuccess() {
     const [params] = useSearchParams();
-    const ticketId  = params.get("ticket");
+    const ticketId = params.get("ticket");
+    const showBg   = params.get("bg") !== "false" && params.get("bg") !== "0";
+
+    useThemeParam();
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center px-4">
+        <div className={`${
+            showBg
+                ? "min-h-screen bg-gray-50 dark:bg-gray-950"
+                : ""
+        } flex items-center justify-center px-4 py-12`}>
             <motion.div
                 className="text-center max-w-sm"
                 initial={{ opacity: 0, scale: 0.95 }}
