@@ -16,12 +16,26 @@ function useThemeParam() {
     }, []);
 }
 
+function useIframeResizer() {
+    useEffect(() => {
+        function sendHeight() {
+            const height = document.documentElement.scrollHeight;
+            window.parent.postMessage({ type: "supportFormHeight", height }, "*");
+        }
+        sendHeight();
+        const ro = new ResizeObserver(sendHeight);
+        ro.observe(document.documentElement);
+        return () => ro.disconnect();
+    }, []);
+}
+
 export default function SupportSuccess() {
     const [params] = useSearchParams();
     const ticketId = params.get("ticket");
     const showBg   = params.get("bg") !== "false" && params.get("bg") !== "0";
 
     useThemeParam();
+    useIframeResizer();
 
     return (
         <div className={`${
