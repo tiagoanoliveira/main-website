@@ -4,7 +4,7 @@ import {
     getTicketByPublicToken, getTicketMessages,
     createTicketMessage, getSiteById, createAttachment, getAttachments,
 } from "~/lib/db";
-import { sendAdminNotification } from "~/lib/email";
+import { sendAdminNotification, sendOwnerNotification } from "~/lib/email";
 import { uploadFile, buildR2Key } from "~/lib/storage";
 import { getSessionUser } from "~/lib/auth.server";
 import StatusBadge from "~/components/ui/StatusBadge";
@@ -70,17 +70,36 @@ export async function action({ params, request, context }: Route.ActionArgs) {
         }
     }
 
-    // Notificar admin por email (só quando é cliente a responder)
     if (env.RESEND_API_KEY && !isOwner) {
-        await sendAdminNotification({
-            apiKey:     env.RESEND_API_KEY,
-            from:       env.FROM_EMAIL,
-            adminEmail: env.ADMIN_EMAIL,
-            clientName: ticket.client_name,
-            ticketId:   ticket.id,
-            message,
-            baseUrl:    env.BASE_URL,
-        }).catch(console.error);
+        // Notificar admin por email
+        if (env.ADMIN_EMAIL) {
+            await sendAdminNotification({
+                apiKey:     env.RESEND_API_KEY,
+                from:       env.FROM_EMAIL,
+                adminEmail: env.ADMIN_EMAIL,
+                clientName: ticket.client_name,
+                ticketId:   ticket.id,
+                message,
+                baseUrl:    env.BASE_URL,
+            }).catch(console.error);
+        }
+
+        // Notificar owner do site (se existir e for diferente do admin)
+        if (site?.owner_email && site.owner_email !== env.ADMIN_EMAIL) {
+            await sendOwnerNotification({
+                apiKey:      env.RESEND_API_KEY,
+                from:        env.FROM_EMAIL,
+                ownerEmail:  site.owner_email,
+                ownerName:   site.owner_name ?? null,
+                siteName:    site.name,
+                clientName:  ticket.client_name,
+                ticketId:    ticket.id,
+                message,
+                publicToken: ticket.public_token,
+                baseUrl:     env.BASE_URL,
+                isNewTicket: false,
+            }).catch(console.error);
+        }
     }
 
     // Redireciona para limpar o formulário

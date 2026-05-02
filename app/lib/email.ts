@@ -140,6 +140,75 @@ export async function sendAdminNotification(params: {
   });
 }
 
+// ── Notificação ao owner do site ───────────────────────────────────────────
+// Enviada ao dono do site (owner_email) quando:
+//   - Um novo ticket é aberto no formulário do seu site
+//   - O cliente adiciona uma resposta ao ticket
+// O link aponta para o portal do cliente (/portal/tickets) onde o owner
+// pode acompanhar e responder aos tickets do seu site.
+export async function sendOwnerNotification(params: {
+  apiKey: string;
+  from: string;
+  ownerEmail: string;
+  ownerName: string | null;
+  siteName: string;
+  clientName: string;
+  ticketId: number;
+  message: string;
+  publicToken: string;
+  baseUrl: string;
+  isNewTicket?: boolean;
+  category?: string;
+}) {
+  const resend   = new Resend(params.apiKey);
+  const url      = `${params.baseUrl}/ticket/${params.publicToken}`;
+  const portalUrl = `${params.baseUrl}/portal`;
+  const isNew    = params.isNewTicket ?? false;
+  const greeting = params.ownerName ? `Olá <strong>${params.ownerName}</strong>,` : "Olá,";
+
+  const subject = isNew
+    ? `[Novo Ticket #${params.ticketId}] ${params.category ?? ""} — ${params.siteName}`
+    : `[Ticket #${params.ticketId}] Nova resposta de ${params.clientName} — ${params.siteName}`;
+
+  const heading = isNew
+    ? `Novo Pedido de Suporte em ${params.siteName}`
+    : `Nova Resposta no Ticket #${params.ticketId}`;
+
+  const intro = isNew
+    ? `<strong>${params.clientName}</strong> submeteu um novo pedido de suporte no teu site <strong>${params.siteName}</strong>${params.category ? ` — <strong>${params.category}</strong>` : ""}:`
+    : `<strong>${params.clientName}</strong> adicionou uma nova resposta ao ticket <strong>#${params.ticketId}</strong> no teu site <strong>${params.siteName}</strong>:`;
+
+  return sendEmail(resend, {
+    from: params.from,
+    to:   params.ownerEmail,
+    subject,
+    html: `
+    <div style="${style}">
+      <div style="background:#0f172a;padding:24px;border-radius:12px 12px 0 0;">
+        <h1 style="color:white;margin:0;font-size:18px;">${heading}</h1>
+        <p style="color:#94a3b8;margin:6px 0 0;font-size:13px;">${params.siteName}</p>
+      </div>
+      <div style="background:#f9fafb;padding:24px;border-radius:0 0 12px 12px;border:1px solid #e5e7eb;border-top:none;">
+        <p style="margin:0 0 12px;">${greeting}</p>
+        <p style="margin:0 0 16px;color:#6b7280;">${intro}</p>
+        <div style="background:white;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:20px;">
+          <p style="margin:0 0 6px;font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;">TICKET #${params.ticketId}${params.category ? " · " + params.category : ""}</p>
+          <p style="margin:0;line-height:1.7;color:#374151;">${params.message.replace(/\n/g, "<br>")}</p>
+        </div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;">
+          <a href="${url}" style="display:inline-block;background:#0f172a;color:white;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">
+            Ver Ticket
+          </a>
+          <a href="${portalUrl}" style="display:inline-block;background:white;color:#0f172a;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;border:1px solid #e5e7eb;">
+            Portal Cliente
+          </a>
+        </div>
+        <p style="margin:20px 0 0;font-size:12px;color:#9ca3af;">Podes responder diretamente através do link acima.</p>
+      </div>
+    </div>`,
+  });
+}
+
 // ── Password reset ────────────────────────────────────────────────────────
 export async function sendPasswordReset(params: {
   apiKey: string;

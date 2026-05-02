@@ -7,7 +7,7 @@ import {
     GLOBAL_CATEGORY,
 } from "~/lib/db";
 import type { ExtraField, CategoryExtraFields } from "~/lib/db";
-import { sendTicketConfirmation, sendAdminNotification } from "~/lib/email";
+import { sendTicketConfirmation, sendAdminNotification, sendOwnerNotification } from "~/lib/email";
 import { uploadFile, buildR2Key } from "~/lib/storage";
 import { Loader2, Paperclip } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -98,6 +98,7 @@ export async function action({ params, request, context }: Route.ActionArgs) {
             : env.FROM_EMAIL;
 
         if (env.RESEND_API_KEY) {
+            // 1. Confirmação ao cliente
             try {
                 await sendTicketConfirmation({
                     apiKey: env.RESEND_API_KEY, from,
@@ -106,6 +107,7 @@ export async function action({ params, request, context }: Route.ActionArgs) {
                 });
             } catch (err) { console.error("[email] confirmação:", err); }
 
+            // 2. Notificação ao admin
             if (env.ADMIN_EMAIL) {
                 try {
                     await sendAdminNotification({
@@ -115,6 +117,20 @@ export async function action({ params, request, context }: Route.ActionArgs) {
                         baseUrl: env.BASE_URL, isNewTicket: true, category,
                     });
                 } catch (err) { console.error("[email] notificação admin:", err); }
+            }
+
+            // 3. Notificação ao owner do site (se existir e for diferente do admin)
+            if (site.owner_email && site.owner_email !== env.ADMIN_EMAIL) {
+                try {
+                    await sendOwnerNotification({
+                        apiKey: env.RESEND_API_KEY, from,
+                        ownerEmail: site.owner_email,
+                        ownerName:  site.owner_name,
+                        siteName:   site.name,
+                        clientName, ticketId: id, message: description, publicToken,
+                        baseUrl: env.BASE_URL, isNewTicket: true, category,
+                    });
+                } catch (err) { console.error("[email] notificação owner:", err); }
             }
         }
 
@@ -154,7 +170,6 @@ function applyTheme() {
         document.documentElement.removeAttribute("data-theme");
     }
 }
-// Run once immediately at module evaluation time so it fires before React paints
 if (typeof window !== "undefined") applyTheme();
 
 function useIframeResizer() {
@@ -237,8 +252,6 @@ export default function SupportForm() {
 
     useIframeResizer();
 
-    // ── Read ?bg= synchronously so the value is correct on first render ──
-    // getSearchParam is safe for SSR (returns null server-side)
     const bgParam = getSearchParam("bg");
     const showBg  = bgParam !== "false" && bgParam !== "0";
 
