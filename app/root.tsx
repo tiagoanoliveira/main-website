@@ -7,17 +7,29 @@ import type { Route } from "./+types/root";
 import "./app.css";
 
 export const links: Route.LinksFunction = () => [
-    // ── Favicon ──────────────────────────────────────
+    // ── Favicon ────────────────────────────────────────────────
     { rel: "icon", type: "image/x-icon", href: "/favicon.ico" },
     { rel: "icon", type: "image/png", sizes: "192x192", href: "/icons/icon-192.png" },
     { rel: "apple-touch-icon", sizes: "180x180", href: "/icons/icon-192.png" },
-    // ── PWA manifest ─────────────────────────────────
+    // ── PWA manifest ────────────────────────────────────────────
     { rel: "manifest", href: "/manifest.json" },
-    // ── Fonts ────────────────────────────────────────
+    // ── Fonts ──────────────────────────────────────────────────
     { rel: "preconnect", href: "https://fonts.googleapis.com" },
     { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
     { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" },
 ];
+
+// Blocking script: runs before first paint to apply data-theme from ?theme= param.
+// This prevents any flash of wrong theme on support form pages.
+const themeScript = `
+(function(){
+  var t = new URLSearchParams(window.location.search).get('theme');
+  if (t === 'dark' || t === 'light') {
+    document.documentElement.setAttribute('data-theme', t);
+  }
+  // 'system' or no param -> no attribute -> CSS media query takes over
+})();
+`;
 
 export function Layout({ children }: { children: React.ReactNode }) {
     return (
@@ -26,6 +38,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <meta charSet="utf-8" />
             <meta name="viewport" content="width=device-width, initial-scale=1" />
             <meta name="theme-color" content="#2563eb" />
+            {/* Blocking theme script — must be before any CSS-in-JS or style sheets */}
+            <script dangerouslySetInnerHTML={{ __html: themeScript }} />
             <Meta /><Links />
         </head>
         <body className="bg-white dark:bg-gray-950 text-gray-900 dark:text-white">
@@ -54,7 +68,6 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
             <div className="text-center">
                 <h1 className="text-4xl font-bold mb-4">{is404 ? "404" : "Erro"}</h1>
                 <p className="text-gray-500">{is404 ? "Página não encontrada." : "Ocorreu um erro inesperado."}</p>
-                <a href="/" className="mt-6 inline-block text-blue-600 hover:underline">Voltar ao início</a>
             </div>
         </div>
     );
