@@ -153,13 +153,15 @@ function useIframeResizer() {
 }
 
 // ── Resolve theme from ?theme= param ─────────────────────────────────────
+// Accepted values: "light" | "dark" | "system" (default — follows device)
 function useThemeParam() {
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         const theme  = params.get("theme");
         if (theme === "light" || theme === "dark") {
             document.documentElement.setAttribute("data-theme", theme);
-        } else if (theme === "system" || !theme) {
+        } else {
+            // "system" or any other value → remove override, let CSS media query decide
             document.documentElement.removeAttribute("data-theme");
         }
     }, []);
@@ -234,6 +236,7 @@ export default function SupportForm() {
     useThemeParam();
 
     // Read ?bg= param (default: true — show background)
+    // Accepted values: "false" | "0" → no background; anything else → show background
     const [showBg, setShowBg] = useState(true);
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);

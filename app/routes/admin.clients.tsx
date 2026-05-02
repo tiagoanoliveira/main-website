@@ -215,9 +215,34 @@ function CopyButton({ value, label = "" }: { value: string; label?: string }) {
     );
 }
 
+/**
+ * EmbedSnippet — generates an iframe embed code with configurable
+ * ?theme= (light | dark | system) and ?bg= (true | false) parameters.
+ *
+ * URL parameters supported by the support form:
+ *   theme=light|dark|system   — colour scheme (default: system)
+ *   bg=true|false             — show/hide the form background card (default: true)
+ */
 function EmbedSnippet({ token, baseUrl }: { token: string; baseUrl: string }) {
-    const [open, setOpen] = useState(false);
-    const snippet = `<iframe\n  src="${baseUrl}/support/${token}"\n  width="100%"\n  height="620"\n  frameborder="0"\n  style="border-radius:12px;border:none;"\n></iframe>`;
+    const [open, setOpen]   = useState(false);
+    const [theme, setTheme] = useState<"system" | "light" | "dark">("system");
+    const [bg, setBg]       = useState(true);
+
+    const qs = new URLSearchParams();
+    if (theme !== "system") qs.set("theme", theme);
+    if (!bg) qs.set("bg", "false");
+    const qsStr  = qs.toString();
+    const srcUrl = `${baseUrl}/support/${token}${qsStr ? `?${qsStr}` : ""}`;
+
+    const snippet =
+        `<iframe\n` +
+        `  src="${srcUrl}"\n` +
+        `  width="100%"\n` +
+        `  height="620"\n` +
+        `  frameborder="0"\n` +
+        `  style="border-radius:12px;border:none;"\n` +
+        `></iframe>`;
+
     return (
         <>
             <button type="button" onClick={() => setOpen((v) => !v)}
@@ -233,11 +258,43 @@ function EmbedSnippet({ token, baseUrl }: { token: string; baseUrl: string }) {
                             <h3 className="font-semibold text-sm">Código para integrar no website</h3>
                             <button type="button" onClick={() => setOpen(false)} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
                         </div>
-                        <p className="text-xs text-gray-500 mb-3">Cola este código no teu website onde queres mostrar o formulário de suporte:</p>
+                        <p className="text-xs text-gray-500 mb-4">Cola este código no teu website onde queres mostrar o formulário de suporte:</p>
+
+                        {/* ── Options ── */}
+                        <div className="grid grid-cols-2 gap-3 mb-4">
+                            <div>
+                                <label className="block text-[11px] font-medium text-gray-500 mb-1.5">Tema de cor</label>
+                                <select
+                                    value={theme}
+                                    onChange={(e) => setTheme(e.target.value as typeof theme)}
+                                    className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                >
+                                    <option value="system">Dispositivo (padrão)</option>
+                                    <option value="light">Claro</option>
+                                    <option value="dark">Escuro</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-[11px] font-medium text-gray-500 mb-1.5">Fundo do formulário</label>
+                                <select
+                                    value={bg ? "true" : "false"}
+                                    onChange={(e) => setBg(e.target.value === "true")}
+                                    className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                >
+                                    <option value="true">Com fundo (padrão)</option>
+                                    <option value="false">Sem fundo</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* ── Snippet ── */}
                         <div className="relative bg-gray-50 dark:bg-gray-800 rounded-xl p-4 font-mono text-xs whitespace-pre-wrap break-all border border-gray-200 dark:border-gray-700">
                             {snippet}
                             <div className="absolute top-2 right-2"><CopyButton value={snippet} label="Copiar" /></div>
                         </div>
+                        <p className="text-[11px] text-gray-400 mt-2">
+                            Parâmetros: <code>?theme=light|dark|system</code> · <code>?bg=true|false</code>
+                        </p>
                     </div>
                 </div>
             )}

@@ -3,6 +3,7 @@ import { motion } from "motion/react";
 import { CheckCircle } from "lucide-react";
 import { useEffect } from "react";
 
+// Accepted values: "light" | "dark" | "system" (default — follows device)
 function useThemeParam() {
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
