@@ -215,33 +215,124 @@ function CopyButton({ value, label = "" }: { value: string; label?: string }) {
     );
 }
 
-/**
- * EmbedSnippet — generates an iframe embed code with configurable
- * ?theme= (light | dark | system) and ?bg= (true | false) parameters.
- *
- * URL parameters supported by the support form:
- *   theme=light|dark|system   — colour scheme (default: system)
- *   bg=true|false             — show/hide the form background card (default: true)
- */
-function EmbedSnippet({ token, baseUrl }: { token: string; baseUrl: string }) {
-    const [open, setOpen]   = useState(false);
-    const [theme, setTheme] = useState<"system" | "light" | "dark">("system");
-    const [bg, setBg]       = useState(true);
+// ── EmbedSnippet ───────────────────────────────────────────────
+type EmbedTab = "html" | "react" | "typescript";
+type ThemeParam = "system" | "light" | "dark";
 
+function buildSrcUrl(baseUrl: string, token: string, theme: ThemeParam, bg: boolean): string {
     const qs = new URLSearchParams();
     if (theme !== "system") qs.set("theme", theme);
     if (!bg) qs.set("bg", "false");
-    const qsStr  = qs.toString();
-    const srcUrl = `${baseUrl}/support/${token}${qsStr ? `?${qsStr}` : ""}`;
+    const qsStr = qs.toString();
+    return `${baseUrl}/support/${token}${qsStr ? `?${qsStr}` : ""}`;
+}
 
-    const snippet =
-        `<iframe\n` +
-        `  src="${srcUrl}"\n` +
-        `  width="100%"\n` +
-        `  height="620"\n` +
-        `  frameborder="0"\n` +
-        `  style="border-radius:12px;border:none;"\n` +
-        `></iframe>`;
+function generateHtml(srcUrl: string): string {
+    return `<iframe
+  src="${srcUrl}"
+  id="support-form"
+  width="100%"
+  height="620"
+  frameborder="0"
+  style="border:none;display:block;"
+  title="Formulário de Suporte"
+></iframe>
+<script>
+  window.addEventListener("message", function (e) {
+    if (e.data && e.data.type === "supportFormHeight") {
+      var el = document.getElementById("support-form");
+      if (el) el.style.height = e.data.height + "px";
+    }
+  });
+<\/script>`;
+}
+
+function generateReact(srcUrl: string): string {
+    return `import { useEffect, useRef } from "react";
+
+export function SupportForm() {
+  const ref = useRef<HTMLIFrameElement>(null);
+
+  useEffect(() => {
+    function onMessage(e: MessageEvent) {
+      if (e.data?.type === "supportFormHeight" && ref.current) {
+        ref.current.style.height = e.data.height + "px";
+      }
+    }
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, []);
+
+  return (
+    <iframe
+      ref={ref}
+      src="${srcUrl}"
+      width="100%"
+      height={620}
+      frameBorder={0}
+      style={{ border: "none", display: "block" }}
+      title="Formulário de Suporte"
+    />
+  );
+}`;
+}
+
+function generateTypescript(srcUrl: string): string {
+    return `import { useEffect, useRef } from "react";
+
+interface SupportFormMessageEvent {
+  type: "supportFormHeight";
+  height: number;
+}
+
+export function SupportForm(): JSX.Element {
+  const ref = useRef<HTMLIFrameElement>(null);
+
+  useEffect(() => {
+    function onMessage(e: MessageEvent<SupportFormMessageEvent>): void {
+      if (e.data?.type === "supportFormHeight" && ref.current) {
+        ref.current.style.height = \`\${e.data.height}px\`;
+      }
+    }
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, []);
+
+  return (
+    <iframe
+      ref={ref}
+      src="${srcUrl}"
+      width="100%"
+      height={620}
+      frameBorder={0}
+      style={{ border: "none", display: "block" }}
+      title="Formulário de Suporte"
+    />
+  );
+}`;
+}
+
+function EmbedSnippet({ token, baseUrl }: { token: string; baseUrl: string }) {
+    const [open, setOpen]   = useState(false);
+    const [tab, setTab]     = useState<EmbedTab>("html");
+    const [theme, setTheme] = useState<ThemeParam>("system");
+    const [bg, setBg]       = useState(true);
+
+    const srcUrl = buildSrcUrl(baseUrl, token, theme, bg);
+
+    const snippets: Record<EmbedTab, string> = {
+        html:       generateHtml(srcUrl),
+        react:      generateReact(srcUrl),
+        typescript: generateTypescript(srcUrl),
+    };
+
+    const tabLabels: Record<EmbedTab, string> = {
+        html:       "HTML",
+        react:      "React (JSX)",
+        typescript: "TypeScript",
+    };
+
+    const snippet = snippets[tab];
 
     return (
         <>
@@ -251,49 +342,104 @@ function EmbedSnippet({ token, baseUrl }: { token: string; baseUrl: string }) {
                 <Code2 size={14} />
                 <span className="hidden sm:inline">Embed</span>
             </button>
-            {open && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setOpen(false)}>
-                    <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 max-w-lg w-full mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-between mb-3">
-                            <h3 className="font-semibold text-sm">Código para integrar no website</h3>
-                            <button type="button" onClick={() => setOpen(false)} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
-                        </div>
-                        <p className="text-xs text-gray-500 mb-4">Cola este código no teu website onde queres mostrar o formulário de suporte:</p>
 
-                        {/* ── Options ── */}
-                        <div className="grid grid-cols-2 gap-3 mb-4">
+            {open && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+                    onClick={() => setOpen(false)}>
+                    <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 max-w-2xl w-full shadow-2xl flex flex-col gap-4"
+                        onClick={(e) => e.stopPropagation()}>
+
+                        {/* Header */}
+                        <div className="flex items-center justify-between">
                             <div>
-                                <label className="block text-[11px] font-medium text-gray-500 mb-1.5">Tema de cor</label>
+                                <h3 className="font-semibold text-sm">Integrar formulário de suporte</h3>
+                                <p className="text-xs text-gray-400 mt-0.5">
+                                    Configura os parâmetros e copia o código para o teu website.
+                                </p>
+                            </div>
+                            <button type="button" onClick={() => setOpen(false)}
+                                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
+                                <X size={16} />
+                            </button>
+                        </div>
+
+                        {/* Options */}
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="block text-[11px] font-medium text-gray-500 mb-1.5">
+                                    Tema de cor
+                                </label>
                                 <select
                                     value={theme}
-                                    onChange={(e) => setTheme(e.target.value as typeof theme)}
-                                    className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                                >
+                                    onChange={(e) => setTheme(e.target.value as ThemeParam)}
+                                    className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500">
                                     <option value="system">Dispositivo (padrão)</option>
                                     <option value="light">Claro</option>
                                     <option value="dark">Escuro</option>
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-[11px] font-medium text-gray-500 mb-1.5">Fundo do formulário</label>
+                                <label className="block text-[11px] font-medium text-gray-500 mb-1.5">
+                                    Fundo do formulário
+                                </label>
                                 <select
                                     value={bg ? "true" : "false"}
                                     onChange={(e) => setBg(e.target.value === "true")}
-                                    className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                                >
+                                    className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500">
                                     <option value="true">Com fundo (padrão)</option>
                                     <option value="false">Sem fundo</option>
                                 </select>
                             </div>
                         </div>
 
-                        {/* ── Snippet ── */}
-                        <div className="relative bg-gray-50 dark:bg-gray-800 rounded-xl p-4 font-mono text-xs whitespace-pre-wrap break-all border border-gray-200 dark:border-gray-700">
-                            {snippet}
-                            <div className="absolute top-2 right-2"><CopyButton value={snippet} label="Copiar" /></div>
+                        {/* URL preview */}
+                        <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 border border-gray-200 dark:border-gray-700">
+                            <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wider shrink-0">URL</span>
+                            <code className="text-xs text-gray-600 dark:text-gray-300 truncate flex-1">{srcUrl}</code>
+                            <CopyButton value={srcUrl} />
                         </div>
-                        <p className="text-[11px] text-gray-400 mt-2">
-                            Parâmetros: <code>?theme=light|dark|system</code> · <code>?bg=true|false</code>
+
+                        {/* Tabs */}
+                        <div className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                            {(["html", "react", "typescript"] as EmbedTab[]).map((t) => (
+                                <button
+                                    key={t}
+                                    type="button"
+                                    onClick={() => setTab(t)}
+                                    className={`flex-1 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                                        tab === t
+                                            ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm"
+                                            : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                                    }`}>
+                                    {tabLabels[t]}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Code block */}
+                        <div className="relative">
+                            <pre className="bg-gray-950 text-gray-100 rounded-xl p-4 text-xs leading-relaxed overflow-x-auto whitespace-pre font-mono max-h-72 overflow-y-auto">
+                                {snippet}
+                            </pre>
+                            <div className="absolute top-2 right-2">
+                                <button
+                                    type="button"
+                                    onClick={async () => {
+                                        await navigator.clipboard.writeText(snippet);
+                                    }}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white text-xs rounded-lg transition-colors font-medium">
+                                    <Copy size={12} />
+                                    Copiar código
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Footer note */}
+                        <p className="text-[11px] text-gray-400">
+                            Parâmetros suportados:{" "}
+                            <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded">?theme=light|dark|system</code>
+                            {" · "}
+                            <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded">?bg=true|false</code>
                         </p>
                     </div>
                 </div>
