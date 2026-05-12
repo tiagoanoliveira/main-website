@@ -12,21 +12,28 @@ import { motion } from "motion/react";
 import { Loader2, Send, Paperclip, FileText, Image } from "lucide-react";
 import { useRef, useEffect } from "react";
 
-export async function loader({ params, context }: Route.LoaderArgs) {
-    const db      = context.cloudflare.env.DB;
-    const ticket  = await getTicketByPublicToken(db, params.token);
+export async function loader({ params, context, request }: Route.LoaderArgs) {
+    const db          = context.cloudflare.env.DB;
+    const ticket      = await getTicketByPublicToken(db, params.token);
     if (!ticket) throw data("Ticket não encontrado", { status: 404 });
+
     const messages    = await getTicketMessages(db, ticket.id);
     const attachments = await getAttachments(db, "ticket", ticket.id);
 
     // Attachments por mensagem
     const messageIds = messages.map(m => m.id);
     const msgAttachments = messageIds.length > 0
-        ? await getAttachments(db, "ticket_message", messageIds[0])
-            .then(() => Promise.all(messageIds.map(id => getAttachments(db, "ticket_message", id))))
+        ? await Promise.all(messageIds.map(id => getAttachments(db, "ticket_message", id)))
         : [];
 
-    return { ticket, messages, attachments, msgAttachments };
+    // Determinar se quem está a ver é o suporte (admin ou owner autenticado)
+    const sessionUser  = await getSessionUser(db, request);
+    const site         = await getSiteById(db, ticket.site_id);
+    const isStaffViewer = sessionUser !== null && (
+        site?.owner_id === sessionUser.id || sessionUser.role === "admin"
+    );
+
+    return { ticket, messages, attachments, msgAttachments, isStaffViewer };
 }
 
 export async function action({ params, request, context }: Route.ActionArgs) {
@@ -42,11 +49,12 @@ export async function action({ params, request, context }: Route.ActionArgs) {
     if (message.length < 2)
         return data({ error: "A mensagem é demasiado curta." }, { status: 400 });
 
-    // Detectar se é o dono do site autenticado via portal
+    // Detectar se é o dono do site ou admin autenticado via portal
     const sessionUser = await getSessionUser(db, request);
     const site        = await getSiteById(db, ticket.site_id);
     const isOwner     = sessionUser !== null && site?.owner_id === sessionUser.id;
-    const sender      = isOwner ? "owner" : "client";
+    const isAdmin     = sessionUser !== null && sessionUser.role === "admin";
+    const sender      = (isOwner || isAdmin) ? (isAdmin ? "admin" : "owner") : "client";
 
     const msgId = await createTicketMessage(db, { ticketId: ticket.id, sender, message });
 
@@ -70,8 +78,8 @@ export async function action({ params, request, context }: Route.ActionArgs) {
         }
     }
 
-    if (env.RESEND_API_KEY && !isOwner) {
-        // Notificar admin por email
+    // Enviar notificações apenas quando é o cliente a responder
+    if (env.RESEND_API_KEY && sender === "client") {
         if (env.ADMIN_EMAIL) {
             await sendAdminNotification({
                 apiKey:     env.RESEND_API_KEY,
@@ -84,7 +92,6 @@ export async function action({ params, request, context }: Route.ActionArgs) {
             }).catch(console.error);
         }
 
-        // Notificar owner do site (se existir e for diferente do admin)
         if (site?.owner_email && site.owner_email !== env.ADMIN_EMAIL) {
             await sendOwnerNotification({
                 apiKey:      env.RESEND_API_KEY,
@@ -102,7 +109,6 @@ export async function action({ params, request, context }: Route.ActionArgs) {
         }
     }
 
-    // Redireciona para limpar o formulário
     return redirect(`/ticket/${params.token}#latest`);
 }
 
@@ -122,13 +128,12 @@ function AttachmentChip({ r2Key, fileName, fileType }: { r2Key: string; fileName
 }
 
 export default function TicketPublic() {
-    const { ticket, messages, attachments, msgAttachments } = useLoaderData<typeof loader>();
+    const { ticket, messages, attachments, msgAttachments, isStaffViewer } = useLoaderData<typeof loader>();
     const result    = useActionData<typeof action>();
     const nav       = useNavigation();
     const isLoading = nav.state === "submitting";
     const formRef   = useRef<HTMLFormElement>(null);
 
-    // Limpa o formulário após submissão bem-sucedida
     useEffect(() => {
         if (nav.state === "idle" && !result?.error) {
             formRef.current?.reset();
@@ -149,7 +154,7 @@ export default function TicketPublic() {
                     </p>
                 </motion.div>
 
-                {/* Descrição inicial */}
+                {/* Descrição inicial — sempre do lado do cliente (esquerda para staff, direita para cliente) */}
                 <motion.div
                     className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 mb-6"
                     initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
@@ -172,30 +177,45 @@ export default function TicketPublic() {
                 {messages.length > 0 && (
                     <div className="space-y-4 mb-6">
                         {messages.map((msg, i) => {
-                            const isAdmin  = msg.sender === "admin";
-                            const isOwner  = msg.sender === "owner";
-                            const msgAtts  = msgAttachments[i] ?? [];
+                            const msgAtts = msgAttachments[i] ?? [];
 
-                            const bubbleClass = isAdmin
-                                ? "bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-tl-sm"
-                                : isOwner
-                                ? "bg-purple-600 text-white rounded-tr-sm"
-                                : "bg-blue-600 text-white rounded-tr-sm";
+                            // "suporte" = admin ou owner; "cliente" = client
+                            const isFromStaff = msg.sender === "admin" || msg.sender === "owner";
 
-                            const metaClass = isAdmin ? "text-gray-400" : "text-white/70";
-                            const senderLabel = isAdmin ? "Suporte Técnico" : isOwner ? ticket.site_name : ticket.client_name;
+                            // Quem está a ver:
+                            //   staff viewer  → mensagens do staff à direita, do cliente à esquerda
+                            //   client viewer → mensagens do cliente à direita, do staff à esquerda
+                            const alignRight = isStaffViewer ? isFromStaff : !isFromStaff;
+
+                            // Cores da bolha
+                            // Staff (admin/owner) → cinzento claro (suporte)
+                            // Cliente             → azul
+                            const bubbleClass = isFromStaff
+                                ? "bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800"
+                                : "bg-blue-600 text-white";
+
+                            const metaClass    = isFromStaff ? "text-gray-400" : "text-white/70";
+                            const textClass    = isFromStaff ? "" : "text-white";
+                            const senderLabel  = msg.sender === "admin"
+                                ? "Suporte Técnico"
+                                : msg.sender === "owner"
+                                ? ticket.site_name
+                                : ticket.client_name;
+
+                            // Arredondar o canto oposto ao lado de onde a bolha "nasce"
+                            const cornerClass  = alignRight ? "rounded-tr-sm" : "rounded-tl-sm";
 
                             return (
                                 <motion.div
                                     key={msg.id}
                                     id={i === messages.length - 1 ? "latest" : undefined}
-                                    className={`flex ${isAdmin ? "justify-start" : "justify-end"}`}
+                                    className={`flex ${alignRight ? "justify-end" : "justify-start"}`}
                                     initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
                                     transition={{ delay: 0.05 + i * 0.04 }}
                                 >
-                                    <div className={`max-w-[85%] rounded-2xl px-5 py-4 text-sm ${bubbleClass}`}>
+                                    <div className={`max-w-[85%] rounded-2xl px-5 py-4 text-sm ${bubbleClass} ${cornerClass}`}>
                                         <p className={`text-xs font-semibold mb-1.5 ${metaClass}`}>{senderLabel}</p>
-                                        <p className="leading-relaxed whitespace-pre-wrap">{msg.message}</p>
+                                        <p className={`leading-relaxed whitespace-pre-wrap ${textClass}`}>{msg.message}</p>
                                         {msgAtts.length > 0 && (
                                             <div className="flex flex-wrap gap-2 mt-2">
                                                 {msgAtts.map(a => (
@@ -232,7 +252,6 @@ export default function TicketPublic() {
                                 placeholder="Escreve aqui a tua resposta ou informação adicional…"
                                 className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
-                            {/* Anexos */}
                             <div>
                                 <label className="flex items-center gap-1.5 text-xs font-medium text-gray-500 mb-1.5">
                                     <Paperclip size={12} />
