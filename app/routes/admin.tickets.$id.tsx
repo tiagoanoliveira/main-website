@@ -11,7 +11,7 @@ import { sendAdminReply } from "~/lib/email";
 import { uploadFile, buildR2Key } from "~/lib/storage";
 import { getSessionUser } from "~/lib/auth.server";
 import { Paperclip, Mail, Phone, User, ExternalLink, Pencil, Trash2, Check, X } from "lucide-react";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 
 export async function loader({ params, context, request }: Route.LoaderArgs) {
     const db          = context.cloudflare.env.DB;
@@ -100,7 +100,6 @@ export async function action({ request, params, context }: Route.ActionArgs) {
         const newMessage = String(form.get("newMessage") || "").trim();
         if (!newMessage) return data({ error: "A mensagem não pode estar vazia." }, { status: 400 });
 
-        // Verificar que a mensagem pertence ao sender correcto
         const msg = await getTicketMessageById(db, msgId);
         if (!msg) return data({ error: "Mensagem não encontrada." }, { status: 404 });
         const expectedSender = isAdminUser ? "admin" : "owner";
@@ -121,7 +120,6 @@ export async function action({ request, params, context }: Route.ActionArgs) {
             return data({ error: "Não podes apagar mensagens de outros." }, { status: 403 });
         }
 
-        // Apagar anexos da mensagem
         const attachments = await getAttachments(db, "ticket_message", msgId);
         for (const att of attachments) {
             try { await env.UPLOADS.delete(att.r2_key); } catch { /* ignore */ }
@@ -149,131 +147,180 @@ export async function action({ request, params, context }: Route.ActionArgs) {
     return null;
 }
 
+// ── Auto-growing textarea ─────────────────────────────────────────────────
+function AutoTextarea({
+    value, onChange, className, textareaRef,
+}: {
+    value: string;
+    onChange: (v: string) => void;
+    className: string;
+    textareaRef: React.RefObject<HTMLTextAreaElement | null>;
+}) {
+    // Ajusta a altura automaticamente ao conteúdo
+    useEffect(() => {
+        const el = textareaRef.current;
+        if (!el) return;
+        el.style.height = "auto";
+        el.style.height = `${el.scrollHeight}px`;
+    }, [value, textareaRef]);
+
+    return (
+        <textarea
+            ref={textareaRef}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            rows={4}
+            style={{ minHeight: "100px" }}
+            className={className}
+        />
+    );
+}
+
 // ── Componente de bolha de mensagem com edição inline ─────────────────────
 function MessageBubble({
-    msg, atts, viewerRole, senderLabel, ticketId,
+    msg, atts, viewerRole, senderLabel,
 }: {
     msg: { id: number; sender: string; message: string; created_at: string; edited_at?: string | null };
     atts: { id: number; r2_key: string; file_name: string; file_type: string }[];
     viewerRole: "admin" | "owner";
     senderLabel: string;
-    ticketId: number;
 }) {
-    const [editing, setEditing]   = useState(false);
-    const [draft,   setDraft]     = useState(msg.message);
-    const [confirm, setConfirm]   = useState(false);
-    const textareaRef             = useRef<HTMLTextAreaElement>(null);
+    const [editing, setEditing] = useState(false);
+    const [draft,   setDraft]   = useState(msg.message);
+    const [confirm, setConfirm] = useState(false);
+    const textareaRef           = useRef<HTMLTextAreaElement>(null);
 
-    const isFromStaff   = msg.sender === "admin" || msg.sender === "owner";
-    const isOwnMessage  = msg.sender === viewerRole; // só edita as suas próprias
-    const alignRight    = isFromStaff;
+    const isFromStaff  = msg.sender === "admin" || msg.sender === "owner";
+    const isOwnMessage = msg.sender === viewerRole;
+    const alignRight   = isFromStaff;
 
-    const bubbleClass = msg.sender === "admin"
+    const bubbleColor = msg.sender === "admin"
         ? "bg-blue-600 text-white rounded-tr-sm"
         : msg.sender === "owner"
         ? "bg-purple-600 text-white rounded-tr-sm"
         : "bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-tl-sm";
+
     const metaClass = isFromStaff ? "text-white/70" : "text-gray-400";
+
+    // Quando entra em modo de edição, a bolha ocupa a largura total do contentor
+    // para que o textarea tenha espaço confortável.
+    const wrapperWidth = editing ? "w-full" : "max-w-[80%]";
 
     return (
         <div className={`flex ${alignRight ? "justify-end" : "justify-start"} group`}>
-            <div className={`relative max-w-[80%] rounded-2xl px-5 py-3.5 text-sm ${bubbleClass}`}>
+            <div className={`relative ${wrapperWidth} rounded-2xl px-5 py-3.5 text-sm transition-all duration-200 ${editing ? "" : bubbleColor}`}
+                style={editing ? {} : {}}>
 
-                {/* Barra de acções — aparece no hover apenas nas próprias mensagens */}
-                {isOwnMessage && !editing && (
-                    <div className={`absolute top-2 ${alignRight ? "-left-16" : "-right-16"} flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity`}>
-                        <button
-                            type="button"
-                            title="Editar"
-                            onClick={() => { setDraft(msg.message); setEditing(true); setTimeout(() => textareaRef.current?.focus(), 50); }}
-                            className="p-1.5 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-blue-600 hover:border-blue-300 shadow-sm transition-colors"
-                        >
-                            <Pencil size={13} />
-                        </button>
-                        <button
-                            type="button"
-                            title="Apagar"
-                            onClick={() => setConfirm(true)}
-                            className="p-1.5 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-red-600 hover:border-red-300 shadow-sm transition-colors"
-                        >
-                            <Trash2 size={13} />
-                        </button>
-                    </div>
-                )}
-
-                {/* Confirmação de apagar */}
-                {confirm && (
-                    <div className="absolute inset-0 rounded-2xl bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center gap-2 z-10 px-4">
-                        <p className="text-white text-xs font-medium text-center">Apagar esta mensagem?</p>
-                        <div className="flex gap-2">
-                            <Form method="post">
-                                <input type="hidden" name="intent"    value="deleteMessage" />
-                                <input type="hidden" name="messageId" value={msg.id} />
-                                <button type="submit"
-                                    className="flex items-center gap-1 px-3 py-1 bg-red-500 hover:bg-red-600 text-white text-xs rounded-lg transition-colors">
-                                    <Trash2 size={11} /> Apagar
-                                </button>
-                            </Form>
-                            <button type="button" onClick={() => setConfirm(false)}
-                                className="flex items-center gap-1 px-3 py-1 bg-white/20 hover:bg-white/30 text-white text-xs rounded-lg transition-colors">
-                                <X size={11} /> Cancelar
-                            </button>
-                        </div>
-                    </div>
-                )}
-
-                {/* Conteúdo normal ou modo edição */}
-                <p className={`text-xs font-semibold mb-1.5 ${metaClass}`}>{senderLabel}</p>
-
+                {/* Modo de edição — card neutro separado visualmente */}
                 {editing ? (
-                    <div className="space-y-2">
-                        <textarea
-                            ref={textareaRef}
+                    <div className="bg-white dark:bg-gray-900 border-2 border-blue-400 dark:border-blue-500 rounded-2xl p-5 shadow-lg">
+                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+                            Editar mensagem
+                        </p>
+                        <AutoTextarea
+                            textareaRef={textareaRef}
                             value={draft}
-                            onChange={(e) => setDraft(e.target.value)}
-                            rows={3}
-                            className={`w-full rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 ${
-                                isFromStaff
-                                    ? "bg-white/20 text-white placeholder-white/50 focus:ring-white/40 border border-white/30"
-                                    : "bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 focus:ring-blue-500"
-                            }`}
+                            onChange={setDraft}
+                            className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 leading-relaxed"
                         />
-                        <div className="flex justify-end gap-2">
+                        <div className="flex justify-end gap-2 mt-3">
+                            <button
+                                type="button"
+                                onClick={() => setEditing(false)}
+                                className="flex items-center gap-1.5 px-4 py-2 text-sm text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                            >
+                                <X size={13} /> Cancelar
+                            </button>
                             <Form method="post">
                                 <input type="hidden" name="intent"     value="editMessage" />
                                 <input type="hidden" name="messageId"  value={msg.id} />
                                 <input type="hidden" name="newMessage" value={draft} />
-                                <button type="submit"
-                                    className="flex items-center gap-1 px-3 py-1 bg-white/20 hover:bg-white/30 text-white text-xs rounded-lg border border-white/30 transition-colors">
-                                    <Check size={11} /> Guardar
+                                <button
+                                    type="submit"
+                                    className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                                >
+                                    <Check size={13} /> Guardar alterações
                                 </button>
                             </Form>
-                            <button type="button" onClick={() => setEditing(false)}
-                                className="flex items-center gap-1 px-3 py-1 bg-white/10 hover:bg-white/20 text-white/80 text-xs rounded-lg border border-white/20 transition-colors">
-                                <X size={11} /> Cancelar
-                            </button>
                         </div>
                     </div>
                 ) : (
-                    <p className="leading-relaxed whitespace-pre-wrap">{msg.message}</p>
-                )}
+                    /* Vista normal da bolha */
+                    <div className={`rounded-2xl px-5 py-3.5 ${bubbleColor}`}>
 
-                {/* Anexos */}
-                {atts.length > 0 && !editing && (
-                    <div className="mt-3">
-                        <Attachments
-                            attachments={atts}
-                            entityType="ticket_message"
-                            entityId={msg.id}
-                            canDelete={viewerRole === "admin" && msg.sender === "admin"}
-                        />
+                        {/* Botões de ação no hover */}
+                        {isOwnMessage && (
+                            <div className={`absolute top-2 ${alignRight ? "-left-16" : "-right-16"} flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity`}>
+                                <button
+                                    type="button"
+                                    title="Editar"
+                                    onClick={() => {
+                                        setDraft(msg.message);
+                                        setEditing(true);
+                                        setTimeout(() => {
+                                            textareaRef.current?.focus();
+                                            textareaRef.current?.setSelectionRange(
+                                                textareaRef.current.value.length,
+                                                textareaRef.current.value.length
+                                            );
+                                        }, 60);
+                                    }}
+                                    className="p-1.5 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-blue-600 hover:border-blue-300 shadow-sm transition-colors"
+                                >
+                                    <Pencil size={13} />
+                                </button>
+                                <button
+                                    type="button"
+                                    title="Apagar"
+                                    onClick={() => setConfirm(true)}
+                                    className="p-1.5 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-red-600 hover:border-red-300 shadow-sm transition-colors"
+                                >
+                                    <Trash2 size={13} />
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Confirmação de apagar */}
+                        {confirm && (
+                            <div className="absolute inset-0 rounded-2xl bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center gap-2 z-10 px-4">
+                                <p className="text-white text-xs font-medium text-center">Apagar esta mensagem?</p>
+                                <div className="flex gap-2">
+                                    <Form method="post">
+                                        <input type="hidden" name="intent"    value="deleteMessage" />
+                                        <input type="hidden" name="messageId" value={msg.id} />
+                                        <button type="submit"
+                                            className="flex items-center gap-1 px-3 py-1 bg-red-500 hover:bg-red-600 text-white text-xs rounded-lg transition-colors">
+                                            <Trash2 size={11} /> Apagar
+                                        </button>
+                                    </Form>
+                                    <button type="button" onClick={() => setConfirm(false)}
+                                        className="flex items-center gap-1 px-3 py-1 bg-white/20 hover:bg-white/30 text-white text-xs rounded-lg transition-colors">
+                                        <X size={11} /> Cancelar
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        <p className={`text-xs font-semibold mb-1.5 ${metaClass}`}>{senderLabel}</p>
+                        <p className="leading-relaxed whitespace-pre-wrap">{msg.message}</p>
+
+                        {atts.length > 0 && (
+                            <div className="mt-3">
+                                <Attachments
+                                    attachments={atts}
+                                    entityType="ticket_message"
+                                    entityId={msg.id}
+                                    canDelete={viewerRole === "admin" && msg.sender === "admin"}
+                                />
+                            </div>
+                        )}
+
+                        <p className={`text-xs mt-1.5 ${metaClass}`}>
+                            {new Date(msg.created_at).toLocaleString("pt-PT")}
+                            {msg.edited_at && <span className="ml-1 opacity-60">(editado)</span>}
+                        </p>
                     </div>
                 )}
-
-                <p className={`text-xs mt-1.5 ${metaClass}`}>
-                    {new Date(msg.created_at).toLocaleString("pt-PT")}
-                    {msg.edited_at && <span className="ml-1 opacity-60">(editado)</span>}
-                </p>
             </div>
         </div>
     );
@@ -389,7 +436,6 @@ export default function AdminTicketDetail() {
                                 atts={msgAttachments[i] ?? []}
                                 viewerRole={viewerRole}
                                 senderLabel={senderLabel}
-                                ticketId={ticket.id}
                             />
                         );
                     })}
