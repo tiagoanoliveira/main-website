@@ -119,6 +119,7 @@ export interface TicketMessage {
     message: string;
     is_read: number;
     created_at: string;
+    edited_at?: string | null;
 }
 
 export interface Invoice {
@@ -344,6 +345,31 @@ export async function createTicketMessage(
         .bind(data.ticketId, data.sender, data.message)
         .run();
     return Number(r.meta.last_row_id);
+}
+
+export async function updateTicketMessage(
+    db: D1Database,
+    messageId: number,
+    newMessage: string
+): Promise<void> {
+    await db.prepare(
+        `UPDATE ticket_messages SET message = ?, edited_at = datetime('now') WHERE id = ?`
+    ).bind(newMessage, messageId).run();
+}
+
+export async function deleteTicketMessage(
+    db: D1Database,
+    messageId: number
+): Promise<void> {
+    await db.prepare("DELETE FROM ticket_messages WHERE id = ?").bind(messageId).run();
+}
+
+export async function getTicketMessageById(
+    db: D1Database,
+    messageId: number
+): Promise<TicketMessage | null> {
+    return db.prepare("SELECT * FROM ticket_messages WHERE id = ? LIMIT 1")
+        .bind(messageId).first<TicketMessage>();
 }
 
 export async function updateTicketStatus(db: D1Database, ticketId: number, status: string): Promise<void> {

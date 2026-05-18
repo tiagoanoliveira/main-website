@@ -1,21 +1,22 @@
 import { data, redirect, useLoaderData, useActionData, Form } from "react-router";
 import type { Route } from "./+types/admin.tickets.$id";
 import {
-    getTicketById, getTicketByPublicToken, getTicketMessages, createTicketMessage,
-    updateTicketStatus, getAttachments, createAttachment, deleteAttachment, getSiteById,
+    getTicketById, getTicketMessages, createTicketMessage,
+    updateTicketStatus, getAttachments, createAttachment, deleteAttachment,
+    getSiteById, updateTicketMessage, deleteTicketMessage, getTicketMessageById,
 } from "~/lib/db";
 import StatusBadge from "~/components/ui/StatusBadge";
 import Attachments from "~/components/ui/Attachments";
 import { sendAdminReply } from "~/lib/email";
 import { uploadFile, buildR2Key } from "~/lib/storage";
 import { getSessionUser } from "~/lib/auth.server";
-import { Paperclip, Mail, Phone, User, ExternalLink } from "lucide-react";
+import { Paperclip, Mail, Phone, User, ExternalLink, Pencil, Trash2, Check, X } from "lucide-react";
+import { useState, useRef } from "react";
 
 export async function loader({ params, context, request }: Route.LoaderArgs) {
     const db          = context.cloudflare.env.DB;
     const sessionUser = await getSessionUser(db, request);
 
-    // Aceita tanto /admin/tickets/:id (número) como redirect do ticket público
     const id = Number(params.id);
     if (isNaN(id)) throw data("ID inválido", { status: 400 });
 
@@ -25,22 +26,17 @@ export async function loader({ params, context, request }: Route.LoaderArgs) {
     ]);
     if (!ticket) throw data("Ticket não encontrado", { status: 404 });
 
-    // Verificar acesso: admin vê tudo; owner só vê os seus sites
-    const site = await getSiteById(db, ticket.site_id);
+    const site    = await getSiteById(db, ticket.site_id);
     const isAdmin = sessionUser?.role === "admin";
     const isOwner = sessionUser !== null && site?.owner_id === sessionUser.id;
-    if (!isAdmin && !isOwner) {
-        throw data("Sem permissão", { status: 403 });
-    }
+    if (!isAdmin && !isOwner) throw data("Sem permissão", { status: 403 });
 
     const ticketAttachments = await getAttachments(db, "ticket", id);
     const msgAttachments    = await Promise.all(
         messages.map((m) => getAttachments(db, "ticket_message", m.id))
     );
 
-    // viewerRole usado para determinar o sender ao responder e o label
     const viewerRole: "admin" | "owner" = isAdmin ? "admin" : "owner";
-
     return { ticket, messages, ticketAttachments, msgAttachments, viewerRole, site };
 }
 
@@ -51,12 +47,15 @@ export async function action({ request, params, context }: Route.ActionArgs) {
     const form   = await request.formData();
     const intent = String(form.get("intent"));
 
-    // Determinar o sender da resposta com base na sessão
     const sessionUser = await getSessionUser(db, request);
     const ticket      = await getTicketById(db, id);
     const site        = ticket ? await getSiteById(db, ticket.site_id) : null;
     const isAdminUser = sessionUser?.role === "admin";
     const isOwnerUser = sessionUser !== null && site?.owner_id === sessionUser.id;
+
+    if (!isAdminUser && !isOwnerUser) {
+        throw data("Sem permissão", { status: 403 });
+    }
 
     if (intent === "reply") {
         const message = String(form.get("message") || "").trim();
@@ -90,9 +89,46 @@ export async function action({ request, params, context }: Route.ActionArgs) {
                     ticketId: id, category: ticket.category, message,
                     publicToken: ticket.public_token, baseUrl: env.BASE_URL,
                 });
-            } catch (err) { console.error("[email] erro ao enviar resposta ao cliente:", err); }
+            } catch (err) { console.error("[email] erro:", err); }
         }
 
+        return redirect(`/admin/tickets/${id}`);
+    }
+
+    if (intent === "editMessage") {
+        const msgId      = Number(form.get("messageId"));
+        const newMessage = String(form.get("newMessage") || "").trim();
+        if (!newMessage) return data({ error: "A mensagem não pode estar vazia." }, { status: 400 });
+
+        // Verificar que a mensagem pertence ao sender correcto
+        const msg = await getTicketMessageById(db, msgId);
+        if (!msg) return data({ error: "Mensagem não encontrada." }, { status: 404 });
+        const expectedSender = isAdminUser ? "admin" : "owner";
+        if (msg.sender !== expectedSender) {
+            return data({ error: "Não podes editar mensagens de outros." }, { status: 403 });
+        }
+
+        await updateTicketMessage(db, msgId, newMessage);
+        return redirect(`/admin/tickets/${id}`);
+    }
+
+    if (intent === "deleteMessage") {
+        const msgId = Number(form.get("messageId"));
+        const msg   = await getTicketMessageById(db, msgId);
+        if (!msg) return data({ error: "Mensagem não encontrada." }, { status: 404 });
+        const expectedSender = isAdminUser ? "admin" : "owner";
+        if (msg.sender !== expectedSender) {
+            return data({ error: "Não podes apagar mensagens de outros." }, { status: 403 });
+        }
+
+        // Apagar anexos da mensagem
+        const attachments = await getAttachments(db, "ticket_message", msgId);
+        for (const att of attachments) {
+            try { await env.UPLOADS.delete(att.r2_key); } catch { /* ignore */ }
+        }
+        await db.prepare("DELETE FROM attachments WHERE entity_type = 'ticket_message' AND entity_id = ?")
+            .bind(msgId).run();
+        await deleteTicketMessage(db, msgId);
         return redirect(`/admin/tickets/${id}`);
     }
 
@@ -113,6 +149,137 @@ export async function action({ request, params, context }: Route.ActionArgs) {
     return null;
 }
 
+// ── Componente de bolha de mensagem com edição inline ─────────────────────
+function MessageBubble({
+    msg, atts, viewerRole, senderLabel, ticketId,
+}: {
+    msg: { id: number; sender: string; message: string; created_at: string; edited_at?: string | null };
+    atts: { id: number; r2_key: string; file_name: string; file_type: string }[];
+    viewerRole: "admin" | "owner";
+    senderLabel: string;
+    ticketId: number;
+}) {
+    const [editing, setEditing]   = useState(false);
+    const [draft,   setDraft]     = useState(msg.message);
+    const [confirm, setConfirm]   = useState(false);
+    const textareaRef             = useRef<HTMLTextAreaElement>(null);
+
+    const isFromStaff   = msg.sender === "admin" || msg.sender === "owner";
+    const isOwnMessage  = msg.sender === viewerRole; // só edita as suas próprias
+    const alignRight    = isFromStaff;
+
+    const bubbleClass = msg.sender === "admin"
+        ? "bg-blue-600 text-white rounded-tr-sm"
+        : msg.sender === "owner"
+        ? "bg-purple-600 text-white rounded-tr-sm"
+        : "bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-tl-sm";
+    const metaClass = isFromStaff ? "text-white/70" : "text-gray-400";
+
+    return (
+        <div className={`flex ${alignRight ? "justify-end" : "justify-start"} group`}>
+            <div className={`relative max-w-[80%] rounded-2xl px-5 py-3.5 text-sm ${bubbleClass}`}>
+
+                {/* Barra de acções — aparece no hover apenas nas próprias mensagens */}
+                {isOwnMessage && !editing && (
+                    <div className={`absolute top-2 ${alignRight ? "-left-16" : "-right-16"} flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity`}>
+                        <button
+                            type="button"
+                            title="Editar"
+                            onClick={() => { setDraft(msg.message); setEditing(true); setTimeout(() => textareaRef.current?.focus(), 50); }}
+                            className="p-1.5 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-blue-600 hover:border-blue-300 shadow-sm transition-colors"
+                        >
+                            <Pencil size={13} />
+                        </button>
+                        <button
+                            type="button"
+                            title="Apagar"
+                            onClick={() => setConfirm(true)}
+                            className="p-1.5 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-red-600 hover:border-red-300 shadow-sm transition-colors"
+                        >
+                            <Trash2 size={13} />
+                        </button>
+                    </div>
+                )}
+
+                {/* Confirmação de apagar */}
+                {confirm && (
+                    <div className="absolute inset-0 rounded-2xl bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center gap-2 z-10 px-4">
+                        <p className="text-white text-xs font-medium text-center">Apagar esta mensagem?</p>
+                        <div className="flex gap-2">
+                            <Form method="post">
+                                <input type="hidden" name="intent"    value="deleteMessage" />
+                                <input type="hidden" name="messageId" value={msg.id} />
+                                <button type="submit"
+                                    className="flex items-center gap-1 px-3 py-1 bg-red-500 hover:bg-red-600 text-white text-xs rounded-lg transition-colors">
+                                    <Trash2 size={11} /> Apagar
+                                </button>
+                            </Form>
+                            <button type="button" onClick={() => setConfirm(false)}
+                                className="flex items-center gap-1 px-3 py-1 bg-white/20 hover:bg-white/30 text-white text-xs rounded-lg transition-colors">
+                                <X size={11} /> Cancelar
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Conteúdo normal ou modo edição */}
+                <p className={`text-xs font-semibold mb-1.5 ${metaClass}`}>{senderLabel}</p>
+
+                {editing ? (
+                    <div className="space-y-2">
+                        <textarea
+                            ref={textareaRef}
+                            value={draft}
+                            onChange={(e) => setDraft(e.target.value)}
+                            rows={3}
+                            className={`w-full rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 ${
+                                isFromStaff
+                                    ? "bg-white/20 text-white placeholder-white/50 focus:ring-white/40 border border-white/30"
+                                    : "bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 focus:ring-blue-500"
+                            }`}
+                        />
+                        <div className="flex justify-end gap-2">
+                            <Form method="post">
+                                <input type="hidden" name="intent"     value="editMessage" />
+                                <input type="hidden" name="messageId"  value={msg.id} />
+                                <input type="hidden" name="newMessage" value={draft} />
+                                <button type="submit"
+                                    className="flex items-center gap-1 px-3 py-1 bg-white/20 hover:bg-white/30 text-white text-xs rounded-lg border border-white/30 transition-colors">
+                                    <Check size={11} /> Guardar
+                                </button>
+                            </Form>
+                            <button type="button" onClick={() => setEditing(false)}
+                                className="flex items-center gap-1 px-3 py-1 bg-white/10 hover:bg-white/20 text-white/80 text-xs rounded-lg border border-white/20 transition-colors">
+                                <X size={11} /> Cancelar
+                            </button>
+                        </div>
+                    </div>
+                ) : (
+                    <p className="leading-relaxed whitespace-pre-wrap">{msg.message}</p>
+                )}
+
+                {/* Anexos */}
+                {atts.length > 0 && !editing && (
+                    <div className="mt-3">
+                        <Attachments
+                            attachments={atts}
+                            entityType="ticket_message"
+                            entityId={msg.id}
+                            canDelete={viewerRole === "admin" && msg.sender === "admin"}
+                        />
+                    </div>
+                )}
+
+                <p className={`text-xs mt-1.5 ${metaClass}`}>
+                    {new Date(msg.created_at).toLocaleString("pt-PT")}
+                    {msg.edited_at && <span className="ml-1 opacity-60">(editado)</span>}
+                </p>
+            </div>
+        </div>
+    );
+}
+
+// ── Página principal ──────────────────────────────────────────────────────
 export default function AdminTicketDetail() {
     const { ticket, messages, ticketAttachments, msgAttachments, viewerRole, site } =
         useLoaderData<typeof loader>();
@@ -126,7 +293,7 @@ export default function AdminTicketDetail() {
 
     return (
         <div className="max-w-3xl">
-            {/* Cabeçalho com estado e botões de estado */}
+            {/* Cabeçalho */}
             <div className="flex items-start justify-between mb-6">
                 <div>
                     <div className="flex items-center gap-3 mb-1">
@@ -205,54 +372,25 @@ export default function AdminTicketDetail() {
                 <p className="text-xs text-gray-400 mt-3">{new Date(ticket.created_at).toLocaleString("pt-PT")}</p>
             </div>
 
-            {/* Thread de mensagens */}
+            {/* Thread */}
             {messages.length > 0 && (
                 <div className="space-y-4 mb-6">
                     <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Histórico</h2>
                     {messages.map((msg, i) => {
-                        const isFromStaff = msg.sender === "admin" || msg.sender === "owner";
-
-                        // Staff viewer (admin ou owner): as suas próprias mensagens à direita,
-                        // mensagens do cliente à esquerda
-                        const alignRight = isFromStaff;
-
-                        // Cores: admin=azul, owner=roxo, cliente=cinza
-                        const bubbleClass = msg.sender === "admin"
-                            ? "bg-blue-600 text-white rounded-tr-sm"
-                            : msg.sender === "owner"
-                            ? "bg-purple-600 text-white rounded-tr-sm"
-                            : "bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-tl-sm";
-
-                        const metaClass = isFromStaff ? "text-white/70" : "text-gray-400";
-
-                        // Label do remetente
                         const senderLabel = msg.sender === "admin"
                             ? "Suporte Técnico"
                             : msg.sender === "owner"
                             ? (site?.name ?? ticket.site_name)
                             : ticket.client_name;
-
                         return (
-                            <div key={msg.id}
-                                className={`flex ${alignRight ? "justify-end" : "justify-start"}`}>
-                                <div className={`max-w-[80%] rounded-2xl px-5 py-3.5 text-sm ${bubbleClass}`}>
-                                    <p className={`text-xs font-semibold mb-1.5 ${metaClass}`}>{senderLabel}</p>
-                                    <p className="leading-relaxed whitespace-pre-wrap">{msg.message}</p>
-                                    <p className={`text-xs mt-1.5 ${metaClass}`}>
-                                        {new Date(msg.created_at).toLocaleString("pt-PT")}
-                                    </p>
-                                    {msgAttachments[i]?.length > 0 && (
-                                        <div className="mt-3">
-                                            <Attachments
-                                                attachments={msgAttachments[i]}
-                                                entityType="ticket_message"
-                                                entityId={msg.id}
-                                                canDelete={viewerRole === "admin" && msg.sender === "admin"}
-                                            />
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
+                            <MessageBubble
+                                key={msg.id}
+                                msg={msg}
+                                atts={msgAttachments[i] ?? []}
+                                viewerRole={viewerRole}
+                                senderLabel={senderLabel}
+                                ticketId={ticket.id}
+                            />
                         );
                     })}
                 </div>
