@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import { generateOwnerSig } from "~/lib/ownerToken";
 
 const style = `font-family:'Inter',-apple-system,sans-serif;max-width:560px;margin:0 auto;color:#111827;`;
 
@@ -14,7 +15,7 @@ async function sendEmail(
   return data;
 }
 
-// ── Confirmação ao cliente quando submete ticket ──────────────────────────
+// ── Confirmação ao cliente quando submete ticket ────────────────────────
 export async function sendTicketConfirmation(params: {
   apiKey: string;
   from: string;
@@ -54,7 +55,7 @@ export async function sendTicketConfirmation(params: {
   });
 }
 
-// ── Resposta do admin ao cliente ──────────────────────────────────────────
+// ── Resposta do admin ao cliente ────────────────────────────────────────────
 export async function sendAdminReply(params: {
   apiKey: string;
   from: string;
@@ -93,7 +94,7 @@ export async function sendAdminReply(params: {
   });
 }
 
-// ── Notificação ao admin ────────────────────────────────────────────────────
+// ── Notificação ao admin ──────────────────────────────────────────────────
 export async function sendAdminNotification(params: {
   apiKey: string;
   from: string;
@@ -140,12 +141,7 @@ export async function sendAdminNotification(params: {
   });
 }
 
-// ── Notificação ao owner do site ───────────────────────────────────────────
-// Enviada ao dono do site (owner_email) quando:
-//   - Um novo ticket é aberto no formulário do seu site
-//   - O cliente adiciona uma resposta ao ticket
-// O link aponta para o portal do cliente (/portal/tickets) onde o owner
-// pode acompanhar e responder aos tickets do seu site.
+// ── Notificação ao owner do site ──────────────────────────────────────────────────
 export async function sendOwnerNotification(params: {
   apiKey: string;
   from: string;
@@ -159,12 +155,19 @@ export async function sendOwnerNotification(params: {
   baseUrl: string;
   isNewTicket?: boolean;
   category?: string;
+  secretKey?: string;
 }) {
-  const resend   = new Resend(params.apiKey);
-  const url      = `${params.baseUrl}/ticket/${params.publicToken}`;
+  const resend    = new Resend(params.apiKey);
   const portalUrl = `${params.baseUrl}/portal`;
-  const isNew    = params.isNewTicket ?? false;
-  const greeting = params.ownerName ? `Olá <strong>${params.ownerName}</strong>,` : "Olá,";
+  const isNew     = params.isNewTicket ?? false;
+  const greeting  = params.ownerName ? `Olá <strong>${params.ownerName}</strong>,` : "Olá,";
+
+  // Gerar link assinado para o owner responder como 'owner' e não como 'client'
+  let ownerUrl = `${params.baseUrl}/ticket/${params.publicToken}`;
+  if (params.secretKey) {
+    const sig = await generateOwnerSig(params.publicToken, params.secretKey);
+    ownerUrl += `?ownerSig=${encodeURIComponent(sig)}`;
+  }
 
   const subject = isNew
     ? `[Novo Ticket #${params.ticketId}] ${params.category ?? ""} — ${params.siteName}`
@@ -196,20 +199,20 @@ export async function sendOwnerNotification(params: {
           <p style="margin:0;line-height:1.7;color:#374151;">${params.message.replace(/\n/g, "<br>")}</p>
         </div>
         <div style="display:flex;gap:12px;flex-wrap:wrap;">
-          <a href="${url}" style="display:inline-block;background:#0f172a;color:white;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">
-            Ver Ticket
+          <a href="${ownerUrl}" style="display:inline-block;background:#7c3aed;color:white;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">
+            Responder ao Ticket
           </a>
           <a href="${portalUrl}" style="display:inline-block;background:white;color:#0f172a;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;border:1px solid #e5e7eb;">
             Portal Cliente
           </a>
         </div>
-        <p style="margin:20px 0 0;font-size:12px;color:#9ca3af;">Podes responder diretamente através do link acima.</p>
+        <p style="margin:20px 0 0;font-size:12px;color:#9ca3af;">Podes responder diretamente através do botão acima. A resposta será registada como resposta do site <strong>${params.siteName}</strong>.</p>
       </div>
     </div>`,
   });
 }
 
-// ── Password reset ────────────────────────────────────────────────────────
+// ── Password reset ──────────────────────────────────────────────────────────────────
 export async function sendPasswordReset(params: {
   apiKey: string;
   from: string;
@@ -240,7 +243,7 @@ export async function sendPasswordReset(params: {
   });
 }
 
-// ── Boas-vindas ao portal ─────────────────────────────────────────────────
+// ── Boas-vindas ao portal ───────────────────────────────────────────────────────────
 export async function sendWelcome(params: {
   apiKey: string;
   from: string;
