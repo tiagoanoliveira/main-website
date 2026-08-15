@@ -4,7 +4,7 @@
   "description": "Engenharia de interfaces, sistemas e suporte técnico para operações reais.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#090b0f",
-  "theme_color": "#090b0f",
+  "background_color": "#f4f1eb",
+  "theme_color": "#f4f1eb",
   "icons": [{"src":"/logo-512px%20(3).png","sizes":"512x512","type":"image/png","purpose":"any maskable"}]
 }

@@ -1,74 +1,25 @@
-// app/root.tsx
-import {
-    isRouteErrorResponse, Links, Meta,
-    Outlet, Scripts, ScrollRestoration,
-} from "react-router";
+import { Links, Meta, Outlet, Scripts, ScrollRestoration, isRouteErrorResponse, useRouteError } from "react-router";
+import type { LinksFunction } from "react-router";
 import type { Route } from "./+types/root";
-import "./app.css";
+import appStylesHref from "./app.css?url";
 
-export const links: Route.LinksFunction = () => [
-    // ── Favicon ────────────────────────────────────────────────
-    { rel: "icon", type: "image/x-icon", href: "/favicon.ico" },
-    { rel: "icon", type: "image/png", sizes: "192x192", href: "/icons/logo-branco-192px.png" },
-    { rel: "apple-touch-icon", sizes: "180x180", href: "/icons/logo-branco-192px.png" },
-    // ── PWA manifest ────────────────────────────────────────────
-    { rel: "manifest", href: "/manifest.json" },
-    // ── Fonts ──────────────────────────────────────────────────
-    { rel: "preconnect", href: "https://fonts.googleapis.com" },
-    { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-    { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" },
+export const links: LinksFunction = () => [
+  { rel: "stylesheet", href: appStylesHref },
+  { rel: "icon", type: "image/png", href: "/logo-512px%20(3).png" },
+  { rel: "apple-touch-icon", href: "/logo-512px%20(3).png" },
+  { rel: "manifest", href: "/manifest.json" },
 ];
 
-// Blocking script: runs before first paint to apply data-theme from ?theme= param.
-// This prevents any flash of wrong theme on support form pages.
-const themeScript = `
-(function(){
-  var t = new URLSearchParams(window.location.search).get('theme');
-  if (t === 'dark' || t === 'light') {
-    document.documentElement.setAttribute('data-theme', t);
-  }
-  // 'system' or no param -> no attribute -> CSS media query takes over
-})();
-`;
-
 export function Layout({ children }: { children: React.ReactNode }) {
-    return (
-        <html lang="pt">
-        <head>
-            <meta charSet="utf-8" />
-            <meta name="viewport" content="width=device-width, initial-scale=1" />
-            <meta name="theme-color" content="#2563eb" />
-            {/* Blocking theme script — must be before any CSS-in-JS or style sheets */}
-            <script dangerouslySetInnerHTML={{ __html: themeScript }} />
-            <Meta /><Links />
-        </head>
-        <body className="bg-white dark:bg-gray-950 text-gray-900 dark:text-white">
-        {children}
-        <ScrollRestoration />
-        <Scripts />
-        {/* Service Worker */}
-        <script dangerouslySetInnerHTML={{ __html: `
-            if ('serviceWorker' in navigator) {
-                window.addEventListener('load', () => {
-                    navigator.serviceWorker.register('/sw.js').catch(() => {});
-                });
-            }
-        `}} />
-        </body>
-        </html>
-    );
+  return <html lang="pt-PT"><head><meta charSet="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><Meta /><Links /></head><body>{children}<ScrollRestoration /><Scripts /></body></html>;
 }
 
 export default function App() { return <Outlet />; }
 
-export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
-    const is404 = isRouteErrorResponse(error) && error.status === 404;
-    return (
-        <div className="min-h-screen flex items-center justify-center">
-            <div className="text-center">
-                <h1 className="text-4xl font-bold mb-4">{is404 ? "404" : "Erro"}</h1>
-                <p className="text-gray-500">{is404 ? "Página não encontrada." : "Ocorreu um erro inesperado."}</p>
-            </div>
-        </div>
-    );
+export function ErrorBoundary() {
+  const error = useRouteError();
+  let message = "Ocorreu um erro inesperado.";
+  if (isRouteErrorResponse(error)) message = error.status === 404 ? "Página não encontrada." : error.statusText || message;
+  else if (error instanceof Error) message = error.message;
+  return <main style={{ padding: "2rem", fontFamily: "system-ui" }}><h1>Ups!</h1><p>{message}</p></main>;
 }

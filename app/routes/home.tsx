@@ -1,68 +1,79 @@
 // app/routes/home.tsx
-import { motion, useMotionValueEvent, useScroll, useTransform } from "motion/react";
+import { motion, useScroll, useTransform } from "motion/react";
 import { type MetaFunction, useLoaderData } from "react-router";
 import { Link } from "react-router";
-import ScrollProgressBar from "~/components/ui/ScrollProgressBar";
 import { useRef, useState } from "react";
-import { Menu, X, User, ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, Menu, X, User } from "lucide-react";
 import type { Route } from "./+types/home";
 import { getPublishedProjects } from "~/lib/projects.server";
 import { getSessionUser } from "~/lib/auth.server";
+import ScrollProgressBar from "~/components/ui/ScrollProgressBar";
 
 export const meta: MetaFunction = () => [
-  { title: "Tiago Oliveira" },
-  { name: "description", content: "Tiago Oliveira — engenharia de interfaces, sistemas e suporte técnico para operações reais." },
+  { title: "Tiago Oliveira — Engenharia de produto digital" },
+  { name: "description", content: "Tiago Oliveira cria websites, sistemas e suporte técnico para transformar problemas reais em ferramentas digitais mais claras." },
   { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
 ];
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   const db = context.cloudflare.env.DB;
   const [projects, user] = await Promise.all([
-    getPublishedProjects(db, { sortBy: "order_index", sortDir: "asc", limit: 3 }),
+    getPublishedProjects(db, { sortBy: "order_index", sortDir: "asc", limit: 4 }),
     getSessionUser(db, request),
   ]);
   return { projects, isLoggedIn: !!user };
 }
 
-const scenes = [
-  { id: "brief", kicker: "01 / perceber", title: "Antes da interface, existe a operação.", body: "Um pedido de reserva. Um ticket sem resposta. Um processo preso numa folha de cálculo. Começo por tornar o problema visível.", status: "recolher contexto" },
-  { id: "system", kicker: "02 / estruturar", title: "Depois, transformo ruído em sistema.", body: "Fluxos, estados, permissões e dados passam a ter uma forma que as pessoas conseguem usar sem lutar contra a ferramenta.", status: "modelar solução" },
-  { id: "ship", kicker: "03 / acompanhar", title: "A entrega não termina no deploy.", body: "Uma boa solução continua a ser observada, afinada e explicada. É assim que a tecnologia ganha durabilidade.", status: "manter em movimento" },
+const services = [
+  { number: "01", title: "Websites e experiências digitais", text: "Presença digital com intenção: arquitetura clara, conteúdo legível e uma experiência que representa o teu projeto." },
+  { number: "02", title: "Sistemas de gestão e reservas", text: "Ferramentas para organizar pessoas, espaços, pedidos e informação sem criar mais trabalho para quem as usa." },
+  { number: "03", title: "Automação de processos", text: "Ligo tarefas e dados repetitivos para que o tempo das pessoas possa ser usado onde realmente acrescenta valor." },
+  { number: "04", title: "Suporte e manutenção técnica", text: "Acompanhamento depois da entrega: corrigir, explicar, prevenir e manter os sistemas confiáveis." },
 ];
 
-function SystemWindow({ sceneIndex }: { sceneIndex: number }) {
-  const stage = scenes[sceneIndex];
-  const data = [["RESERVAS", "12", "03 pendentes"], ["SUPORTE", "08", "02 em análise"], ["SISTEMA", "99.8%", "estável"]];
-  return (
-    <div className="system-window" aria-label={`Interface: ${stage.title}`}>
-      <div className="system-window__topbar"><div className="system-window__traffic" aria-hidden="true"><span /><span /><span /></div><span className="system-window__path">/workspace / {stage.id}</span><span className="system-window__state">{stage.status}</span></div>
-      <div className="system-window__body"><div className="system-window__rail" aria-hidden="true"><span className="system-window__rail-mark system-window__rail-mark--active" /><span className="system-window__rail-mark" /><span className="system-window__rail-mark" /><span className="system-window__rail-line" /><span className="system-window__rail-mark" /></div><div className="system-window__content"><div className="system-window__heading"><span>OVERVIEW</span><span>TIAGO / SYSTEMS</span></div><div className="system-window__signal"><div className="system-window__signal-line" /><div className="system-window__signal-line system-window__signal-line--short" /><div className="system-window__signal-node system-window__signal-node--one" /><div className="system-window__signal-node system-window__signal-node--two" /><div className="system-window__signal-node system-window__signal-node--three" /></div><div className="system-window__metrics">{data.map(([label, value, note]) => <div key={label} className="system-window__metric"><span>{label}</span><strong>{value}</strong><small>{note}</small></div>)}</div><div className="system-window__log"><div><span className="system-window__log-dot" /> flow resolved <em>00:04:12</em></div><div><span className="system-window__log-dot system-window__log-dot--muted" /> permissions synced <em>00:04:16</em></div><div><span className="system-window__log-dot" /> next action ready <em>00:04:20</em></div></div></div></div>
-      <div className="system-window__footer"><span>SCENE / {String(sceneIndex + 1).padStart(2, "0")}</span><span>SCROLL TO CHANGE STATE</span></div>
-    </div>
-  );
-}
+const journey = [
+  { label: "Pessoa", text: "Sou engenheiro informático e trabalho entre produto, desenvolvimento e suporte técnico." },
+  { label: "Percurso", text: "Estudo na FEUP, desenvolvo projetos freelance e participo ativamente em iniciativas de voluntariado." },
+  { label: "Prática", text: "Gosto de perceber o contexto antes de escolher a tecnologia — e de continuar presente depois do lançamento." },
+];
 
 export default function Home() {
   const { projects, isLoggedIn } = useLoaderData<typeof loader>();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [sceneIndex, setSceneIndex] = useState(0);
-  const narrativeRef = useRef<HTMLElement>(null);
-  const { scrollYProgress } = useScroll({ target: narrativeRef, offset: ["start start", "end end"] });
-  const windowScale = useTransform(scrollYProgress, [0, 0.45, 1], [0.76, 1, 0.92]);
-  const windowY = useTransform(scrollYProgress, [0, 0.45, 1], [80, 0, -18]);
-  const windowRadius = useTransform(scrollYProgress, [0, 0.45, 1], [32, 12, 0]);
-  const windowWidth = useTransform(scrollYProgress, [0, 0.45, 1], ["78%", "100%", "100%"]);
-  useMotionValueEvent(scrollYProgress, "change", (latest) => { const next = Math.min(2, Math.floor(latest * 3)); setSceneIndex((current) => current === next ? current : next); });
+  const [activeService, setActiveService] = useState(0);
+  const storyRef = useRef<HTMLElement>(null);
+  const { scrollYProgress } = useScroll({ target: storyRef, offset: ["start end", "end start"] });
+  const storyX = useTransform(scrollYProgress, [0, 0.5, 1], ["-12%", "0%", "12%"]);
 
   return (
-    <main className="site-shell">
+    <main className="editorial-home">
       <ScrollProgressBar />
-      <header className="site-header"><div className="site-header__inner"><a href="#top" className="site-mark" aria-label="Tiago Oliveira, início"><span className="site-mark__symbol" aria-hidden="true">T/</span><span>Tiago Oliveira</span></a><nav className="site-nav site-nav--desktop" aria-label="Navegação principal"><a href="#processo">Processo</a><a href="#portfolio">Projetos</a><a href="#contacto">Contacto</a><Link to="/portal" className="site-nav__account"><User size={14} /> {isLoggedIn ? "Conta" : "Portal"}</Link></nav><div className="site-header__mobile-actions"><Link to="/portal" className="site-nav__account"><User size={14} /> {isLoggedIn ? "Conta" : "Portal"}</Link><button type="button" className="menu-button" onClick={() => setMenuOpen((value) => !value)} aria-label="Abrir menu">{menuOpen ? <X size={20} /> : <Menu size={20} />}</button></div></div>{menuOpen && <nav className="site-nav site-nav--mobile" aria-label="Navegação mobile"><a href="#processo" onClick={() => setMenuOpen(false)}>Processo</a><a href="#portfolio" onClick={() => setMenuOpen(false)}>Projetos</a><a href="#contacto" onClick={() => setMenuOpen(false)}>Contacto</a></nav>}</header>
-      <section id="top" className="opening-section"><div className="opening-section__grid" /><div className="opening-section__inner"><p className="eyebrow">Engenharia de produto / Porto, PT</p><h1>Ferramentas digitais para problemas que não cabem num template.</h1><div className="opening-section__bottom"><p>Websites, sistemas internos e suporte técnico — desenhados a partir da forma como o trabalho realmente acontece.</p><a href="#processo" className="scroll-link">Começar a explorar <span>↓</span></a></div></div></section>
-      <section id="processo" ref={narrativeRef} className="narrative-section"><div className="narrative-section__sticky"><div className="narrative-section__copy"><p className="eyebrow">Uma interface em três estados</p><div className="narrative-section__scene-counter">0{sceneIndex + 1} <span>/ 03</span></div><motion.div key={scenes[sceneIndex].id} initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}><p className="narrative-section__kicker">{scenes[sceneIndex].kicker}</p><h2>{scenes[sceneIndex].title}</h2><p>{scenes[sceneIndex].body}</p></motion.div><div className="narrative-section__progress" aria-hidden="true">{scenes.map((scene, index) => <span key={scene.id} className={index <= sceneIndex ? "is-active" : ""} />)}</div></div><motion.div className="narrative-section__window" style={{ scale: windowScale, y: windowY, width: windowWidth, borderRadius: windowRadius }}><SystemWindow sceneIndex={sceneIndex} /></motion.div></div><div className="narrative-section__chapters" aria-hidden="true">{scenes.map((scene) => <div key={scene.id} className="narrative-section__chapter" />)}</div></section>
-      <section className="statement-section"><p className="eyebrow">O resultado</p><h2>Não entrego apenas ecrãs. Entrego uma forma mais clara de trabalhar.</h2></section>
-      <section id="portfolio" className="projects-section"><div className="section-heading"><div><p className="eyebrow">Projetos selecionados</p><h2>Sistemas que saíram do papel.</h2></div><Link to="/projects" className="text-link">Ver todos <ArrowUpRight size={16} /></Link></div><div className="projects-list">{projects.map((project, index) => <Link key={project.slug} to={`/projects/${project.slug}`} className="project-row"><span className="project-row__number">0{index + 1}</span><span className="project-row__title">{project.title}</span><span className="project-row__category">{project.category}</span><ArrowUpRight className="project-row__arrow" size={18} /></Link>)}</div></section>
-      <section id="contacto" className="contact-section"><p className="eyebrow">Próximo sistema</p><h2>O que está a impedir o teu trabalho de fluir?</h2><a href="mailto:geral@tiagoanoliveira.pt" className="contact-section__link">geral@tiagoanoliveira.pt <ArrowUpRight size={20} /></a></section>
+      <header className="editorial-header">
+        <div className="editorial-header__inner">
+          <a href="#top" className="editorial-logo" aria-label="Tiago Oliveira, início"><span>TO</span><strong>Tiago Oliveira</strong></a>
+          <nav className="editorial-nav editorial-nav--desktop" aria-label="Navegação principal"><a href="#sobre">Sobre</a><a href="#servicos">O que faço</a><a href="#projetos">Projetos</a><a href="#contacto">Contacto</a><Link to="/portal" className="editorial-account"><User size={14} /> {isLoggedIn ? "Conta" : "Portal"}</Link></nav>
+          <div className="editorial-mobile-actions"><Link to="/portal" className="editorial-account"><User size={14} /> {isLoggedIn ? "Conta" : "Portal"}</Link><button type="button" className="editorial-menu" onClick={() => setMenuOpen((value) => !value)} aria-label="Abrir menu">{menuOpen ? <X size={20} /> : <Menu size={20} />}</button></div>
+        </div>
+        {menuOpen && <nav className="editorial-nav editorial-nav--mobile"><a href="#sobre" onClick={() => setMenuOpen(false)}>Sobre</a><a href="#servicos" onClick={() => setMenuOpen(false)}>O que faço</a><a href="#projetos" onClick={() => setMenuOpen(false)}>Projetos</a><a href="#contacto" onClick={() => setMenuOpen(false)}>Contacto</a></nav>}
+      </header>
+
+      <section id="top" className="editorial-hero">
+        <div className="editorial-hero__index">01 <span>/ 05</span></div>
+        <div className="editorial-hero__inner"><p className="editorial-label">Engenharia de produto digital · Porto, Portugal</p><h1>Faço a tecnologia ficar mais fácil de usar.</h1><div className="editorial-hero__footer"><p>Websites, sistemas internos e suporte técnico para pessoas e organizações com coisas reais para fazer.</p><a href="#sobre" className="editorial-scroll">Descer para conhecer <span>↓</span></a></div></div>
+      </section>
+
+      <section id="sobre" ref={storyRef} className="editorial-intro">
+        <div className="editorial-intro__rail"><span>02</span><span>/</span><span>sobre</span></div>
+        <div className="editorial-intro__content"><p className="editorial-label">Quem sou</p><motion.h2 style={{ x: storyX }}>Não começo pelo código. Começo por perceber o que precisa de funcionar.</motion.h2><p className="editorial-intro__body">Sou o Tiago, engenheiro informático no Porto. Trabalho na interseção entre desenvolvimento, produto e suporte: transformo necessidades difíceis de explicar em ferramentas que as pessoas conseguem usar.</p><div className="editorial-journey">{journey.map((item, index) => <div className="editorial-journey__item" key={item.label}><span>0{index + 1}</span><div><strong>{item.label}</strong><p>{item.text}</p></div></div>)}</div></div>
+      </section>
+
+      <section id="servicos" className="editorial-services"><div className="editorial-section-head"><div><p className="editorial-label">O que faço</p><h2>Quatro formas de pôr a tecnologia a trabalhar.</h2></div><span className="editorial-section-count">03 / 05</span></div><div className="editorial-services__list">{services.map((service, index) => <button type="button" key={service.number} className={`editorial-service ${activeService === index ? "is-active" : ""}`} onMouseEnter={() => setActiveService(index)} onFocus={() => setActiveService(index)} onClick={() => setActiveService(index)}><span className="editorial-service__number">{service.number}</span><span className="editorial-service__title">{service.title}</span><ArrowUpRight className="editorial-service__arrow" size={22} /><span className="editorial-service__description">{service.text}</span></button>)}</div></section>
+
+      <section id="projetos" className="editorial-projects"><div className="editorial-section-head"><div><p className="editorial-label">Trabalho selecionado</p><h2>Projetos que saíram do papel.</h2></div><Link to="/projects" className="editorial-text-link">Ver portfólio completo <ArrowUpRight size={17} /></Link></div><div className="editorial-project-list">{projects.map((project, index) => <Link to={`/projects/${project.slug}`} className="editorial-project" key={project.slug}><span className="editorial-project__number">0{index + 1}</span><span className="editorial-project__title">{project.title}</span><span className="editorial-project__category">{project.category}</span><span className="editorial-project__summary">{project.summary}</span><ArrowUpRight className="editorial-project__arrow" size={19} /></Link>)}</div><Link to="/projects" className="editorial-projects__more">Explorar todos os projetos <ArrowUpRight size={17} /></Link></section>
+
+      <section className="editorial-statement"><p className="editorial-label">04 / percurso</p><h2>Há sempre uma pessoa, uma equipa ou uma comunidade do outro lado do sistema.</h2><p>É por isso que também me envolvo em voluntariado e projetos associativos. A tecnologia interessa-me mais quando melhora alguma coisa fora do ecrã.</p></section>
+
+      <section id="contacto" className="editorial-contact"><p className="editorial-label">05 / próximo passo</p><h2>O que está a impedir o teu trabalho de fluir?</h2><a href="mailto:geral@tiagoanoliveira.pt" className="editorial-contact__cta">Fala comigo <ArrowUpRight size={23} /></a><div className="editorial-contact__footer"><span>Tiago Oliveira · Porto, Portugal</span><Link to="/cv">Ver CV completo <ArrowUpRight size={15} /></Link></div></section>
     </main>
   );
 }
