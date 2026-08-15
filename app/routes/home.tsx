@@ -10,7 +10,7 @@ import { getSessionUser } from "~/lib/auth.server";
 import ScrollProgressBar from "~/components/ui/ScrollProgressBar";
 
 export const meta: MetaFunction = () => [
-  { title: "Tiago Oliveira — Engenharia de produto digital" },
+  { title: "Tiago Oliveira — Desenvolvimento de Software" },
   { name: "description", content: "Tiago Oliveira cria websites, sistemas e suporte técnico para transformar problemas reais em ferramentas digitais mais claras." },
   { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
 ];
@@ -59,12 +59,12 @@ export default function Home() {
 
       <section id="top" className="editorial-hero">
         <div className="editorial-hero__index">01 <span>/ 05</span></div>
-        <div className="editorial-hero__inner"><p className="editorial-label">Engenharia de produto digital · Porto, Portugal</p><h1>Faço a tecnologia ficar mais fácil de usar.</h1><div className="editorial-hero__footer"><p>Websites, sistemas internos e suporte técnico para pessoas e organizações com coisas reais para fazer.</p><a href="#sobre" className="editorial-scroll">Descer para conhecer <span>↓</span></a></div></div>
+        <div className="editorial-hero__inner"><p className="editorial-label">Software Development · Porto, Portugal</p><h1>"Hi, I'm Tiago and I build solutions users love and businesses value.</h1><div className="editorial-hero__footer"><p>Websites, booking softwares, home automation and cctv systems, etc.</p><a href="#sobre" className="editorial-scroll">Descer para conhecer <span>↓</span></a></div></div>
       </section>
 
       <section id="sobre" ref={storyRef} className="editorial-intro">
         <div className="editorial-intro__rail"><span>02</span><span>/</span><span>sobre</span></div>
-        <div className="editorial-intro__content"><p className="editorial-label">Quem sou</p><motion.h2 style={{ x: storyX }}>Não começo pelo código. Começo por perceber o que precisa de funcionar.</motion.h2><p className="editorial-intro__body">Sou o Tiago, engenheiro informático no Porto. Trabalho na interseção entre desenvolvimento, produto e suporte: transformo necessidades difíceis de explicar em ferramentas que as pessoas conseguem usar.</p><div className="editorial-journey">{journey.map((item, index) => <div className="editorial-journey__item" key={item.label}><span>0{index + 1}</span><div><strong>{item.label}</strong><p>{item.text}</p></div></div>)}</div></div>
+        <div className="editorial-intro__content"><p className="editorial-label">Quem sou</p><motion.h2 style={{ x: storyX }}>Code comes second. First, I bridge the gap between human needs and business goals.</motion.h2><p className="editorial-intro__body">Sou o Tiago, engenheiro informático no Porto. Trabalho na interseção entre desenvolvimento, produto e suporte: transformo necessidades difíceis de explicar em ferramentas que as pessoas conseguem usar.</p><div className="editorial-journey">{journey.map((item, index) => <div className="editorial-journey__item" key={item.label}><span>0{index + 1}</span><div><strong>{item.label}</strong><p>{item.text}</p></div></div>)}</div></div>
       </section>
 
       <section id="servicos" className="editorial-services"><div className="editorial-section-head"><div><p className="editorial-label">O que faço</p><h2>Quatro formas de pôr a tecnologia a trabalhar.</h2></div><span className="editorial-section-count">03 / 05</span></div><div className="editorial-services__list">{services.map((service, index) => <button type="button" key={service.number} className={`editorial-service ${activeService === index ? "is-active" : ""}`} onMouseEnter={() => setActiveService(index)} onFocus={() => setActiveService(index)} onClick={() => setActiveService(index)}><span className="editorial-service__number">{service.number}</span><span className="editorial-service__title">{service.title}</span><ArrowUpRight className="editorial-service__arrow" size={22} /><span className="editorial-service__description">{service.text}</span></button>)}</div></section>
