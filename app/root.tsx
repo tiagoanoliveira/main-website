@@ -9,8 +9,8 @@ import "./app.css";
 export const links: Route.LinksFunction = () => [
     // ── Favicon ────────────────────────────────────────────────
     { rel: "icon", type: "image/x-icon", href: "/favicon.ico" },
-    { rel: "icon", type: "image/png", sizes: "192x192", href: "/icons/icon-192.png" },
-    { rel: "apple-touch-icon", sizes: "180x180", href: "/icons/icon-192.png" },
+    { rel: "icon", type: "image/png", sizes: "192x192", href: "/icons/logo-branco-192px.png" },
+    { rel: "apple-touch-icon", sizes: "180x180", href: "/icons/logo-branco-192px.png" },
     // ── PWA manifest ────────────────────────────────────────────
     { rel: "manifest", href: "/manifest.json" },
     // ── Fonts ──────────────────────────────────────────────────
