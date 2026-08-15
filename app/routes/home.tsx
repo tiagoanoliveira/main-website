@@ -3,21 +3,9 @@ import { motion, AnimatePresence } from "motion/react";
 import { type MetaFunction, useLoaderData } from "react-router";
 import { Link } from "react-router";
 import AnimatedSection from "~/components/ui/AnimatedSection";
-import CounterStat from "~/components/ui/CounterStat";
 import ScrollProgressBar from "~/components/ui/ScrollProgressBar";
 import { useEffect, useState } from "react";
-import {
-  Menu,
-  X,
-  User,
-  GraduationCap,
-  Heart,
-  Briefcase,
-  ArrowRight,
-  Cpu,
-  Network,
-  Server,
-} from "lucide-react";
+import { Menu, X, User, GraduationCap, Heart, Briefcase, ArrowRight } from "lucide-react";
 import type { Route } from "./+types/home";
 import { getPublishedProjects } from "~/lib/projects.server";
 import { getSessionUser } from "~/lib/auth.server";
@@ -27,7 +15,7 @@ export const meta: MetaFunction = () => [
   {
     name: "description",
     content:
-      "Engenheiro Informático no Porto. Desenvolvimento de websites, softwares, manutenção de sistemas e suporte técnico para empresas e particulares.",
+      "Homepage como interface: uma consola para orquestrar websites, sistemas e suporte técnico, desenvolvida por Tiago Oliveira, Engenheiro Informático no Porto.",
   },
   { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
 ];
@@ -41,80 +29,49 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   return { projects, isLoggedIn: !!user };
 }
 
-const stats = [
-  { value: "2+", label: "Anos de experiência" },
-  { value: "10+", label: "Projetos concluídos" },
-];
-
-const skills = [
-  "Sistemas de reservas",
-  "Gestão de espaços",
-  "Aplicações web complexas",
-  "Suporte técnico", 
-  "Infraestrutura" ,
-];
-
-const navLinks = [
-  { href: "/cv", label: "CV" },
-  { href: "#portfolio", label: "Portófolio" },
-  { href: "#contacto", label: "Contacto" },
-];
-
-const cvHighlights = [
+const presets = [
   {
-    icon: GraduationCap,
-    label: "FEUP",
-    detail: "Eng. Informática e Computação",
-    color: "text-blue-400",
-    bg: "bg-blue-950/40",
-  },
-  {
-    icon: Briefcase,
-    label: "Websites com 🤍",
-    detail: "Fundador & Dev freelance",
-    color: "text-sky-300",
-    bg: "bg-sky-950/40",
-  },
-  {
-    icon: Heart,
-    label: "FPF · Easy Future",
-    detail: "Voluntário assíduo desde 2020",
-    color: "text-rose-400",
-    bg: "bg-rose-950/40",
-  },
-];
-
-const thinkingModes = [
-  {
-    id: "discover",
-    icon: Network,
-    label: "Descobrir",
+    id: "websites",
+    label: "Websites & produtos",
     description:
-      "Começo sempre por perceber o contexto real: pessoas, processos e limitações técnicas antes de sugerir qualquer solução.",
+      "Interfaces pensadas para negócios reais: reservas, vendas, gestão de espaços e presença digital consistente.",
+    metrics: {
+      uptime: "99.8%",
+      latency: "40 ms",
+      projects: "10+",
+    },
   },
   {
-    id: "build",
-    icon: Cpu,
-    label: "Construir",
+    id: "systems",
+    label: "Sistemas & automação",
     description:
-      "Arquitetura sólida, código limpo e sistemas pensados para crescer sem se tornarem impossíveis de manter.",
+      "Plataformas internas para organizar operações, automatizar tarefas repetitivas e dar visibilidade ao que importa.",
+    metrics: {
+      uptime: "99.5%",
+      latency: "65 ms",
+      projects: "6+",
+    },
   },
   {
-    id: "refine",
-    icon: Server,
-    label: "Afinar",
+    id: "support",
+    label: "Suporte & infraestrutura",
     description:
-      "Monitorização, suporte contínuo e pequenas melhorias que, acumuladas, fazem grande diferença no dia a dia.",
+      "Acompanhamento técnico contínuo, monitorização, backups e resposta rápida quando algo deixa de funcionar.",
+    metrics: {
+      uptime: "99.9%",
+      latency: "34 ms",
+      projects: "20+",
+    },
   },
 ];
 
 export default function Home() {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [thinkingMode, setThinkingMode] = useState<(typeof thinkingModes)[number]["id"]>("discover");
   const { projects, isLoggedIn } = useLoaderData<typeof loader>();
-
-  // Navbar compacta após scroll
+  const [menuOpen, setMenuOpen] = useState(false);
   const [compactHeader, setCompactHeader] = useState(false);
+  const [activePresetId, setActivePresetId] = useState<(typeof presets)[number]["id"]>("websites");
+
+  const activePreset = presets.find((p) => p.id === activePresetId) ?? presets[0];
 
   useEffect(() => {
     const onScroll = () => {
@@ -125,35 +82,44 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="overflow-x-hidden w-full bg-[#050712] text-gray-100">
+    <div className="overflow-x-hidden w-full bg-slate-950 text-slate-100">
       <ScrollProgressBar />
 
       {/* ───── NAVBAR ───── */}
       <header
-        className={`fixed top-0 left-0 right-0 z-50 backdrop-blur-xl border-b border-slate-800/60 transition-all duration-300 ${
-          compactHeader ? "bg-[#050712]/95 h-14" : "bg-[#050712]/70 h-16"
+        className={`fixed top-0 left-0 right-0 z-50 backdrop-blur-xl border-b border-slate-800/70 transition-all duration-300 ${
+          compactHeader ? "bg-slate-950/95 h-14" : "bg-slate-950/80 h-16"
         }`}
       >
         <div className="max-w-6xl mx-auto px-4 h-full flex items-center justify-between">
-          {/* Logo */}
+          {/* Logo minimalista */}
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-sky-500 via-blue-500 to-indigo-600 flex items-center justify-center shadow-md shadow-sky-500/40">
-              <div className="w-3 h-3 rounded-sm bg-slate-950" />
+            <div className="w-6 h-6 rounded-lg bg-slate-900 border border-slate-700 flex items-center justify-center shadow-sm shadow-sky-500/40">
+              <div className="w-3 h-3 rounded-sm bg-gradient-to-br from-sky-500 via-blue-500 to-indigo-500" />
             </div>
-            <span className="font-semibold tracking-tight text-slate-100">Tiago Oliveira</span>
+            <span className="font-medium tracking-tight text-slate-100">Tiago Oliveira</span>
           </div>
 
           {/* Desktop nav */}
           <nav className="hidden md:flex items-center gap-6">
-            {navLinks.map((l) => (
-              <a
-                key={l.href}
-                href={l.href}
-                className="text-sm font-medium text-slate-400 hover:text-slate-100 transition-colors"
-              >
-                {l.label}
-              </a>
-            ))}
+            <a
+              href="/cv"
+              className="text-sm font-medium text-slate-300 hover:text-sky-300 transition-colors"
+            >
+              CV
+            </a>
+            <a
+              href="#portfolio"
+              className="text-sm font-medium text-slate-300 hover:text-sky-300 transition-colors"
+            >
+              Portófolio
+            </a>
+            <a
+              href="#contacto"
+              className="text-sm font-medium text-slate-300 hover:text-sky-300 transition-colors"
+            >
+              Contacto
+            </a>
             <Link
               to="/portal"
               className="flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg bg-sky-500 hover:bg-sky-400 text-slate-950 transition-colors shadow-sm shadow-sky-500/40"
@@ -190,15 +156,19 @@ export default function Home() {
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
-              className="md:hidden overflow-hidden border-t border-slate-800 bg-[#050712]"
+              className="md:hidden overflow-hidden border-t border-slate-800 bg-slate-950"
             >
               <nav className="flex flex-col px-4 py-3 gap-1">
-                {navLinks.map((l) => (
+                {[
+                  { href: "/cv", label: "CV" },
+                  { href: "#portfolio", label: "Portófolio" },
+                  { href: "#contacto", label: "Contacto" },
+                ].map((l) => (
                   <a
                     key={l.href}
                     href={l.href}
                     onClick={() => setMenuOpen(false)}
-                    className="text-sm font-medium text-slate-200 hover:text-sky-400 py-2.5 px-2 rounded-lg hover:bg-slate-900 transition-colors"
+                    className="text-sm font-medium text-slate-200 hover:text-sky-300 py-2.5 px-2 rounded-lg hover:bg-slate-900 transition-colors"
                   >
                     {l.label}
                   </a>
@@ -209,39 +179,20 @@ export default function Home() {
         </AnimatePresence>
       </header>
 
-      {/* ───── HERO ───── */}
-      <section className="relative min-h-[90vh] flex items-center justify-center px-4 pt-20">
-        {/* Fundo digital */}
-        <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          <motion.div
-            className="absolute top-1/4 -left-24 w-96 h-96 rounded-full bg-sky-500/18 blur-3xl"
-            animate={{ x: [0, 40, 0], y: [0, -30, 0], scale: [1, 1.1, 1] }}
-            transition={{ duration: 14, repeat: Infinity, ease: "easeInOut" }}
-          />
-          <motion.div
-            className="absolute bottom-1/4 -right-24 w-80 h-80 rounded-full bg-indigo-500/20 blur-3xl"
-            animate={{ x: [0, -30, 0], y: [0, 40, 0], scale: [1, 1.15, 1] }}
-            transition={{ duration: 16, repeat: Infinity, ease: "easeInOut", delay: 2 }}
-          />
-          <motion.div
-            className="absolute top-1/2 left-1/2 w-64 h-64 rounded-full bg-cyan-400/8 blur-3xl"
-            animate={{ x: [0, 20, -20, 0], y: [0, -20, 20, 0] }}
-            transition={{ duration: 18, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-          />
-        </div>
-
-        {/* Grid overlay subtil */}
+      {/* ───── HERO: PRODUTO COMO INTERFACE ───── */}
+      <section className="relative min-h-[92vh] flex items-center justify-center px-4 pt-20">
+        {/* Subtle background */}
         <div
-          className="absolute inset-0 opacity-[0.06] pointer-events-none"
+          className="absolute inset-0 opacity-[0.08] pointer-events-none"
           style={{
             backgroundImage:
-              "linear-gradient(#1f2937 1px, transparent 1px), linear-gradient(90deg, #1f2937 1px, transparent 1px)",
-            backgroundSize: "60px 60px",
+              "linear-gradient(#0f172a 1px, transparent 1px), linear-gradient(90deg, #0f172a 1px, transparent 1px)",
+            backgroundSize: "72px 72px",
           }}
         />
 
-        <div className="relative w-full max-w-6xl mx-auto grid md:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] gap-10 items-center">
-          {/* Texto principal */}
+        <div className="relative w-full max-w-6xl mx-auto grid lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] gap-8 lg:gap-12 items-start">
+          {/* Narrativa */}
           <div className="max-w-xl">
             <motion.div
               initial={{ opacity: 0, y: 16 }}
@@ -257,46 +208,45 @@ export default function Home() {
             </motion.div>
 
             <motion.h1
-              className="text-4xl sm:text-5xl md:text-6xl font-semibold mb-4 leading-tight tracking-tight text-slate-50"
-              initial={{ opacity: 0, y: 26 }}
+              className="text-3xl sm:text-4xl md:text-5xl font-semibold mb-4 leading-tight tracking-tight text-slate-50"
+              initial={{ opacity: 0, y: 24 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.1 }}
             >
-              Construo sistemas digitais que continuam a fazer sentido depois do primeiro clique.
+              Uma consola para orquestrar websites, sistemas e suporte técnico.
             </motion.h1>
 
             <motion.p
-              className="text-sm sm:text-base text-slate-300/90 mb-8 max-w-md"
-              initial={{ opacity: 0, y: 26 }}
+              className="text-sm sm:text-base text-slate-300 mb-6 max-w-md"
+              initial={{ opacity: 0, y: 24 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.2 }}
             >
-              Websites, aplicações web, sistemas de gestão e suporte técnico pensados para a vida real de empresas, associações e pessoas.
+              Em vez de apenas mostrar o meu trabalho, esta homepage comporta‑se como uma interface: escolhe um modo e vê como diferentes tipos de sistemas ganham vida.
             </motion.p>
 
             <motion.div
               className="flex flex-wrap gap-3"
-              initial={{ opacity: 0, y: 26 }}
+              initial={{ opacity: 0, y: 24 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.3 }}
             >
               <motion.a
-                href="/cv"
+                href="#interface"
                 whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.97 }}
                 className="px-5 py-2.5 bg-sky-500 hover:bg-sky-400 text-slate-950 rounded-xl font-medium text-sm sm:text-base transition-colors shadow-lg shadow-sky-500/40 flex items-center gap-2"
               >
-                <GraduationCap size={16} />
-                Ver CV
+                Explorar consola
               </motion.a>
               <motion.a
-                href="#portfolio"
+                href="/cv"
                 whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.97 }}
                 className="px-5 py-2.5 border border-slate-700 rounded-xl font-medium text-sm sm:text-base text-slate-200 hover:border-sky-400 hover:text-sky-200 transition-colors flex items-center gap-2"
               >
-                <ArrowRight size={16} />
-                Ver Portófolio
+                <GraduationCap size={16} />
+                Ver CV
               </motion.a>
             </motion.div>
 
@@ -306,99 +256,136 @@ export default function Home() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.4 }}
             >
-              {stats.map((stat) => (
-                <div key={stat.label} className="flex items-center gap-2">
-                  <span className="text-slate-200 font-semibold text-sm">{stat.value}</span>
-                  <span className="text-slate-400 text-xs">{stat.label}</span>
-                </div>
-              ))}
+              <div className="flex items-center gap-2">
+                <span className="text-slate-200 font-semibold text-sm">2+</span>
+                <span className="text-slate-400 text-xs">Anos de experiência</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-slate-200 font-semibold text-sm">10+</span>
+                <span className="text-slate-400 text-xs">Projetos concluídos</span>
+              </div>
             </motion.div>
           </div>
 
-          {/* Painel técnico sticky */}
-          <div className="relative">
+          {/* Consola: produto como interface */}
+          <AnimatedSection id="interface" direction="right" className="relative">
             <motion.div
               initial={{ opacity: 0, y: 32 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: 0.15 }}
-              className="relative rounded-2xl border border-slate-800/80 bg-slate-950/40 backdrop-blur-xl p-4 sm:p-5 shadow-2xl shadow-slate-900/60"
+              transition={{ duration: 0.7, delay: 0.2 }}
+              className="relative rounded-2xl border border-slate-800 bg-slate-900/80 backdrop-blur-xl p-4 sm:p-5 shadow-2xl shadow-slate-900/80"
             >
-              {/* Cabeçalho do painel */}
+              {/* Cabeçalho */}
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                  <span className="text-xs font-medium text-slate-300">Painel de sistemas</span>
+                  <span className="text-[11px] font-medium text-slate-300">Consola de orquestração</span>
                 </div>
-                <span className="text-[11px] text-slate-500">Operacional</span>
+                <span className="text-[11px] text-slate-500">{activePreset.label}</span>
               </div>
 
-              {/* Skills em scroll horizontal leve */}
-              <div className="mb-4 overflow-hidden">
-                <motion.div
-                  className="flex gap-2 whitespace-nowrap"
-                  animate={{ x: ["0%", "-50%"] }}
-                  transition={{ duration: 28, repeat: Infinity, ease: "linear" }}
-                >
-                  {[...skills, ...skills].map((skill, i) => (
-                    <span
-                      key={i}
-                      className="text-[11px] font-medium text-slate-300 px-3 py-1 rounded-full border border-slate-700 bg-slate-900/60 flex-shrink-0"
-                    >
-                      {skill}
-                    </span>
-                  ))}
-                </motion.div>
-              </div>
-
-              {/* Destaques CV */}
-              <div className="grid grid-cols-3 gap-3 mb-4">
-                {cvHighlights.map((highlight) => (
+              {/* Seletor de modos */}
+              <div className="flex gap-2 mb-4">
+                {presets.map((preset) => (
                   <button
-                    key={highlight.label}
+                    key={preset.id}
                     type="button"
-                    className={`${highlight.bg} border border-slate-800/70 rounded-xl p-2 flex flex-col items-start gap-1 text-left hover:border-sky-500/60 transition-colors`}
+                    onClick={() => setActivePresetId(preset.id)}
+                    className={`flex-1 rounded-xl border text-xs sm:text-sm font-medium px-3 py-2 flex items-center gap-2 transition-colors ${
+                      activePresetId === preset.id
+                        ? "border-sky-500 bg-sky-500/10 text-sky-200"
+                        : "border-slate-800 bg-slate-900 text-slate-300 hover:border-sky-500/60 hover:text-sky-200"
+                    }`}
                   >
-                    <highlight.icon size={14} className={highlight.color} />
-                    <span className="text-[11px] font-semibold text-slate-100 truncate">
-                      {highlight.label}
-                    </span>
-                    <span className="text-[10px] text-slate-400 leading-snug line-clamp-2">
-                      {highlight.detail}
-                    </span>
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-sky-500" />
+                    {preset.label}
                   </button>
                 ))}
               </div>
 
-              {/* Indicadores simples */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-xl border border-slate-800/70 bg-slate-950/50 p-3 flex flex-col gap-2">
-                  <span className="text-[11px] text-slate-400">Suporte técnico</span>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-slate-200">Pedidos em curso</span>
-                    <span className="text-xs font-semibold text-sky-300">Ativo</span>
-                  </div>
-                  <div className="mt-1 flex gap-1 h-1.5">
+              {/* Área central com sliders/indicadores */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+                <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3 flex flex-col gap-2">
+                  <span className="text-[11px] text-slate-400">Complexidade do sistema</span>
+                  <div className="mt-1 flex gap-1 h-2">
                     {Array.from({ length: 6 }).map((_, index) => (
                       <div
                         key={index}
-                        className={`flex-1 rounded-full ${index < 4 ? "bg-sky-500" : "bg-slate-700"}`}
+                        className="flex-1 rounded-full bg-gradient-to-r from-sky-500 to-indigo-500"
+                        style={{ opacity: 0.25 + index * 0.12 }}
                       />
                     ))}
                   </div>
+                  <p className="text-[10px] text-slate-500 mt-2">
+                    Ajusto arquitetura e tecnologia à escala e ao contexto de cada projeto.
+                  </p>
                 </div>
-                <div className="rounded-xl border border-slate-800/70 bg-slate-950/50 p-3 flex flex-col gap-2">
-                  <span className="text-[11px] text-slate-400">Sistemas operacionais</span>
-                  <div className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                    <span className="text-[11px] text-slate-300">Online</span>
+
+                <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3 flex flex-col gap-2">
+                  <span className="text-[11px] text-slate-400">Visibilidade operacional</span>
+                  <div className="mt-1 grid grid-cols-4 gap-1">
+                    {Array.from({ length: 4 }).map((_, index) => (
+                      <div
+                        key={index}
+                        className="h-6 rounded-md bg-slate-800 flex items-end overflow-hidden"
+                      >
+                        <div
+                          className="w-full rounded-t-md bg-sky-500"
+                          style={{ height: `${40 + index * 15}%` }}
+                        />
+                      </div>
+                    ))}
                   </div>
-                  <p className="text-[10px] text-slate-500 leading-snug">
-                    Monitorização contínua, backups e atualizações planeadas.
+                  <p className="text-[10px] text-slate-500 mt-2">
+                    Interfaces para acompanhar reservas, tickets, estados e indicadores em tempo real.
+                  </p>
+                </div>
+
+                <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3 flex flex-col gap-2">
+                  <span className="text-[11px] text-slate-400">Suporte & manutenção</span>
+                  <div className="mt-1 flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                    <span className="text-[11px] text-slate-300">Monitorização ativa</span>
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-2">
+                    Acompanhamento técnico contínuo, backups e resposta rápida quando algo falha.
                   </p>
                 </div>
               </div>
+
+              {/* Descrição do preset ativo + métricas */}
+              <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3 sm:p-4 flex flex-col sm:flex-row gap-3 sm:gap-4 items-start sm:items-center">
+                <div className="flex-1">
+                  <AnimatePresence mode="wait">
+                    <motion.p
+                      key={activePreset.id}
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -6 }}
+                      transition={{ duration: 0.25 }}
+                      className="text-xs sm:text-sm text-slate-200 leading-relaxed"
+                    >
+                      {activePreset.description}
+                    </motion.p>
+                  </AnimatePresence>
+                </div>
+                <div className="flex gap-3 text-[11px] text-slate-300">
+                  <div className="flex flex-col">
+                    <span className="text-slate-500">Uptime</span>
+                    <span className="font-semibold text-sky-300">{activePreset.metrics.uptime}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-slate-500">Latência média</span>
+                    <span className="font-semibold text-sky-300">{activePreset.metrics.latency}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-slate-500">Casos reais</span>
+                    <span className="font-semibold text-sky-300">{activePreset.metrics.projects}</span>
+                  </div>
+                </div>
+              </div>
             </motion.div>
-          </div>
+          </AnimatedSection>
         </div>
 
         {/* Indicador de scroll */}
@@ -413,81 +400,16 @@ export default function Home() {
         </motion.div>
       </section>
 
-      {/* ───── SECÇÃO "COMO PENSO" ───── */}
-      <section id="sobre" className="py-12 px-4">
-        <div className="max-w-6xl mx-auto grid md:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] gap-10 items-start">
-          <AnimatedSection>
-            <div className="flex items-center gap-4 mb-6">
-              <div className="w-12 h-12 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center shadow-lg shadow-slate-900/60">
-                <Cpu size={22} className="text-sky-400" />
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-sky-400 uppercase tracking-[0.25em] mb-1.5">
-                  Como penso
-                </p>
-                <h2 className="text-2xl sm:text-3xl font-semibold text-slate-50">
-                  Sistemas bons começam com perguntas certas.
-                </h2>
-              </div>
-            </div>
-            <p className="text-sm sm:text-base text-slate-300 leading-relaxed max-w-xl">
-              Muito além da tecnologia, o meu foco está em compreender o que o sistema precisa de fazer pelas pessoas que o usam. É a partir daí que tomo decisões técnicas — da arquitetura à implementação — para evitar soluções bonitas mas impraticáveis.
-            </p>
-          </AnimatedSection>
-
-          <AnimatedSection direction="right">
-            <div className="rounded-2xl border border-slate-800 bg-slate-950/40 backdrop-blur-xl p-3 sm:p-4 flex flex-col gap-3">
-              <div className="flex gap-2 mb-2">
-                {thinkingModes.map((mode) => (
-                  <button
-                    key={mode.id}
-                    type="button"
-                    onClick={() => setThinkingMode(mode.id)}
-                    className={`flex-1 rounded-xl border text-xs sm:text-sm font-medium px-3 py-2 flex items-center gap-2 transition-colors ${
-                      thinkingMode === mode.id
-                        ? "border-sky-500 bg-sky-500/10 text-sky-200"
-                        : "border-slate-800 bg-slate-900/60 text-slate-300 hover:border-sky-500/60 hover:text-sky-200"
-                    }`}
-                  >
-                    <mode.icon size={14} />
-                    {mode.label}
-                  </button>
-                ))}
-              </div>
-
-              <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-3 sm:p-4 min-h-[96px]">
-                {thinkingModes.map((mode) => (
-                  <AnimatePresence key={mode.id} mode="wait">
-                    {thinkingMode === mode.id && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -8 }}
-                        transition={{ duration: 0.25 }}
-                      >
-                        <p className="text-xs sm:text-sm text-slate-200 leading-relaxed">
-                          {mode.description}
-                        </p>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                ))}
-              </div>
-            </div>
-          </AnimatedSection>
-        </div>
-      </section>
-
-      {/* ───── PORTFOLIO NARRATIVO ───── */}
-      <section id="portfolio" className="py-14 px-4 bg-slate-950/40 border-t border-slate-800/70">
+      {/* ───── PORTFOLIO COMO CONTEXTO ───── */}
+      <section id="portfolio" className="py-14 px-4 bg-slate-950 border-t border-slate-900">
         <div className="max-w-6xl mx-auto">
           <AnimatedSection>
             <div className="flex items-end justify-between mb-10">
               <div>
                 <p className="text-xs font-semibold text-sky-400 uppercase tracking-[0.25em] mb-2">Portófolio</p>
-                <h2 className="text-2xl sm:text-3xl font-semibold text-slate-50">Projetos em contexto real.</h2>
+                <h2 className="text-2xl sm:text-3xl font-semibold text-slate-50">Casos reais ligados à consola.</h2>
                 <p className="text-sm text-slate-400 mt-2 max-w-xl">
-                  Alguns dos sistemas que desenvolvi, focados em problemas concretos: reservas, gestão, automação, suporte e operações.
+                  Cada projeto representa um sistema diferente ligado a esta forma de trabalhar: reservas, gestão, operações internas e suporte técnico.
                 </p>
               </div>
               <Link
@@ -499,74 +421,64 @@ export default function Home() {
             </div>
           </AnimatedSection>
 
-          {/* Palco sticky com capítulos */}
-          <div className="grid md:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] gap-10">
-            {/* Palco visual */}
-            <div className="md:sticky md:top-24">
-              <AnimatedSection direction="left">
-                <div className="rounded-2xl border border-slate-800 bg-slate-950/40 backdrop-blur-xl p-4 sm:p-5 shadow-xl shadow-slate-900/70">
-                  <p className="text-xs font-medium text-slate-400 mb-3">Vista operacional</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="rounded-xl border border-slate-800 bg-slate-900/80 p-3 flex flex-col gap-2">
-                      <span className="text-[11px] text-slate-400">Reservas & espaços</span>
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] text-slate-300">Slots de hoje</span>
-                        <span className="text-[11px] font-semibold text-emerald-300">78% cheios</span>
-                      </div>
-                      <div className="mt-1 flex gap-1 h-1.5">
-                        {Array.from({ length: 8 }).map((_, index) => (
-                          <div
-                            key={index}
-                            className={`flex-1 rounded-full ${index < 6 ? "bg-emerald-400" : "bg-slate-700"}`}
-                          />
-                        ))}
-                      </div>
+          <div className="grid md:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] gap-8">
+            {/* Painel resumo projetos */}
+            <AnimatedSection direction="left">
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/80 backdrop-blur-xl p-4 sm:p-5 shadow-xl shadow-slate-900/70">
+                <p className="text-[11px] font-medium text-slate-300 mb-3">Mapa operacional</p>
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3 flex flex-col gap-2">
+                    <span className="text-[11px] text-slate-400">Reservas & espaços</span>
+                    <div className="mt-1 flex gap-1 h-1.5">
+                      {Array.from({ length: 8 }).map((_, index) => (
+                        <div
+                          key={index}
+                          className={`flex-1 rounded-full ${index < 6 ? "bg-emerald-400" : "bg-slate-700"}`}
+                        />
+                      ))}
                     </div>
-                    <div className="rounded-xl border border-slate-800 bg-slate-900/80 p-3 flex flex-col gap-2">
-                      <span className="text-[11px] text-slate-400">Tickets de suporte</span>
-                      <div className="flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                        <span className="text-[11px] text-slate-300">Prioridade normal</span>
-                      </div>
-                      <p className="text-[10px] text-slate-500 leading-snug">
-                        Filas organizadas, estados claros e automações discretas.
-                      </p>
+                    <span className="mt-2 text-[10px] text-slate-500">Slots ocupados ao longo do dia.</span>
+                  </div>
+                  <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3 flex flex-col gap-2">
+                    <span className="text-[11px] text-slate-400">Tickets de suporte</span>
+                    <div className="mt-1 flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                      <span className="text-[11px] text-slate-300">Fila normalizada</span>
                     </div>
-                    <div className="rounded-xl border border-slate-800 bg-slate-900/80 p-3 flex flex-col gap-2 col-span-2">
-                      <span className="text-[11px] text-slate-400">Telemetria</span>
-                      <div className="flex items-center gap-3">
-                        <div className="flex-1 flex flex-col gap-1">
-                          <span className="text-[11px] text-slate-300">Respostas do sistema</span>
-                          <div className="mt-1 grid grid-cols-6 gap-1">
-                            {Array.from({ length: 6 }).map((_, index) => (
-                              <div
-                                key={index}
-                                className="h-3 rounded-full bg-gradient-to-b from-sky-500 to-indigo-500"
-                                style={{ opacity: 0.4 + index * 0.08 }}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                        <div className="w-24 h-16 rounded-lg border border-slate-800 bg-slate-950 flex items-center justify-center">
-                          <span className="text-[10px] text-slate-400">Latência média
-                            <span className="block text-[11px] text-sky-300 font-semibold">34 ms</span>
-                          </span>
-                        </div>
-                      </div>
+                    <span className="mt-2 text-[10px] text-slate-500">Estados claros e automações discretas.</span>
+                  </div>
+                </div>
+                <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3 flex flex-col gap-2">
+                  <span className="text-[11px] text-slate-400">Telemetria de sistemas</span>
+                  <div className="mt-1 flex gap-2 items-center">
+                    <div className="flex-1 grid grid-cols-6 gap-1">
+                      {Array.from({ length: 6 }).map((_, index) => (
+                        <div
+                          key={index}
+                          className="h-3 rounded-full bg-gradient-to-b from-sky-500 to-indigo-500"
+                          style={{ opacity: 0.4 + index * 0.08 }}
+                        />
+                      ))}
+                    </div>
+                    <div className="w-24 h-16 rounded-lg border border-slate-800 bg-slate-950 flex items-center justify-center">
+                      <span className="text-[10px] text-slate-400">
+                        Latência média
+                        <span className="block text-[11px] text-sky-300 font-semibold">34 ms</span>
+                      </span>
                     </div>
                   </div>
                 </div>
-              </AnimatedSection>
-            </div>
+              </div>
+            </AnimatedSection>
 
-            {/* Capítulos dos projetos */}
+            {/* Lista de projetos */}
             <div className="space-y-6">
               {projects.map((project, index) => (
                 <AnimatedSection key={project.slug} delay={index * 0.08}>
                   <Link to={`/projects/${project.slug}`}>
                     <motion.article
                       whileHover={{ y: -4 }}
-                      className="group rounded-2xl border border-slate-800 bg-slate-950/40 p-4 sm:p-5 cursor-pointer transition-colors hover:border-sky-500/60"
+                      className="group rounded-2xl border border-slate-800 bg-slate-950/80 p-4 sm:p-5 cursor-pointer transition-colors hover:border-sky-500/60"
                     >
                       <div className="flex items-center gap-3 mb-3">
                         <span className="text-[11px] text-slate-500">0{index + 1}</span>
@@ -577,7 +489,7 @@ export default function Home() {
                       <h3 className="font-semibold text-base sm:text-lg text-slate-50 mb-2 group-hover:text-sky-300 transition-colors">
                         {project.title}
                       </h3>
-                      <p className="text-sm text-slate-300/90 mb-3">
+                      <p className="text-sm text-slate-300 mb-3">
                         {project.summary}
                       </p>
                       {project.complexity && (
@@ -605,10 +517,11 @@ export default function Home() {
       </section>
 
       {/* ───── CONTACTO ───── */}
-      <section id="contacto" className="py-12 px-4 border-t border-slate-800/70 bg-[#050712]">
+      <section id="contacto" className="py-12 px-4 border-t border-slate-900 bg-slate-950">
         <div className="max-w-xl mx-auto">
           <AnimatedSection className="relative rounded-2xl overflow-hidden p-4 sm:p-6 text-center bg-gradient-to-br from-sky-500 via-indigo-600 to-purple-700 shadow-2xl shadow-sky-500/40">
-            <div className="absolute inset-0 opacity-[0.12] pointer-events-none"
+            <div
+              className="absolute inset-0 opacity-[0.12] pointer-events-none"
               style={{
                 backgroundImage:
                   "radial-gradient(circle at 0 0, #0f172a 0, transparent 40%), radial-gradient(circle at 100% 100%, #020617 0, transparent 45%)",
