@@ -59,7 +59,7 @@ export default function Home() {
 
       <section id="top" className="editorial-hero">
         <div className="editorial-hero__index">01 <span>/ 05</span></div>
-        <div className="editorial-hero__inner"><p className="editorial-label">Software Development · Porto, Portugal</p><h1>"Hi, I'm Tiago and I build solutions users love and businesses value.</h1><div className="editorial-hero__footer"><p>Websites, booking softwares, home automation and cctv systems, etc.</p><a href="#sobre" className="editorial-scroll">Descer para conhecer <span>↓</span></a></div></div>
+        <div className="editorial-hero__inner"><p className="editorial-label">Software Development · Porto, Portugal</p><h1>Hi, I'm Tiago and I build solutions users love and businesses value.</h1><div className="editorial-hero__footer"><p>Websites, booking softwares, home automation and cctv systems, etc.</p><a href="#sobre" className="editorial-scroll">Descer para conhecer <span>↓</span></a></div></div>
       </section>
 
       <section id="sobre" ref={storyRef} className="editorial-intro">
