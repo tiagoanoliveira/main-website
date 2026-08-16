@@ -229,11 +229,13 @@ a {
 .hero-title {
   max-width: 970px;
   margin: 0;
+  color: var(--foreground);
   font-size: clamp(3.65rem, 8.45vw, 7.75rem);
   font-weight: 700;
   letter-spacing: -0.095em;
   line-height: 0.85;
   perspective: 900px;
+  transition: color 250ms linear;
 }
 
 .hero-word {
@@ -491,6 +493,165 @@ a {
   line-height: 1.6;
 }
 
+.hero-systems-word {
+  position: relative;
+  z-index: 3;
+  display: inline-block;
+  color: var(--accent);
+  white-space: nowrap;
+  will-change: transform, opacity;
+}
+
+.hero-title-ending {
+  display: inline;
+}
+
+.about-section {
+  position: relative;
+  min-height: 100svh;
+  color: var(--background);
+  background: #1c211c;
+}
+
+.services-section {
+  color: var(--foreground);
+  background: var(--background-deep);
+}
+
+.contact-section {
+  color: var(--background);
+  background: #1c211c;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.section-progress {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: rgba(240, 238, 231, 0.45);
+  font-family: "DM Mono", monospace;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+}
+
+.services-section .section-progress {
+  color: rgba(24, 26, 24, 0.45);
+}
+
+.section-progress > span:first-child {
+  color: var(--accent);
+}
+
+.section-progress-track {
+  display: block;
+  width: 45px;
+  height: 1px;
+  overflow: hidden;
+  background: rgba(240, 238, 231, 0.25);
+}
+
+.services-section .section-progress-track {
+  background: rgba(24, 26, 24, 0.2);
+}
+
+.section-progress-fill {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--accent);
+  transform: scaleX(calc(var(--progress, 0%) / 100%));
+  transform-origin: left center;
+}
+
+.section-progress-static {
+  --progress: 100%;
+}
+
+.about-content {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(250px, 0.55fr);
+  align-items: end;
+  gap: clamp(40px, 8vw, 160px);
+  flex: 1;
+  padding: 80px 0;
+}
+
+.about-content h2 {
+  max-width: 800px;
+}
+
+.about-copy {
+  max-width: 340px;
+  margin: 0 0 6px;
+  color: rgba(240, 238, 231, 0.67);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.services-section .about-content h2 {
+  max-width: 920px;
+}
+
+.section-footer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: end;
+  gap: 28px;
+  width: 100%;
+  min-height: 96px;
+  border-top: 1px solid rgba(240, 238, 231, 0.18);
+}
+
+.section-footer-copy {
+  max-width: 385px;
+  margin: 20px 0 23px;
+  color: rgba(240, 238, 231, 0.58);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.section-footer-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding-bottom: 22px;
+  color: rgba(240, 238, 231, 0.85);
+  font-family: "DM Mono", monospace;
+  font-size: 9px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.section-footer-meta span:first-child {
+  color: rgba(240, 238, 231, 0.42);
+  font-size: 8px;
+}
+
+.section-footer-link {
+  display: inline-flex;
+  align-items: center;
+  justify-self: end;
+  gap: 12px;
+  margin-bottom: 22px;
+  color: rgba(240, 238, 231, 0.7);
+  font-family: "DM Mono", monospace;
+  font-size: 9px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  transition: color 180ms ease;
+}
+
+.section-footer-link:hover {
+  color: var(--accent);
+}
+
 @media (max-width: 760px) {
   .hero {
     padding: 0 20px;
@@ -534,15 +695,15 @@ a {
     margin-right: 0.17em;
   }
 
+  .hero-systems-word {
+    white-space: normal;
+  }
+
   .hero-visual {
     top: 54%;
     right: -67%;
     width: 150vw;
     opacity: 0.6;
-  }
-
-  .hero-reveal-word {
-    font-size: clamp(2.8rem, 15vw, 5rem);
   }
 
   .hero-footer {
@@ -571,6 +732,41 @@ a {
   .content-section {
     min-height: 78svh;
     padding: 90px 20px;
+  }
+
+  .about-content {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 28px;
+    padding: 64px 0;
+  }
+
+  .about-copy {
+    max-width: 330px;
+    font-size: 13px;
+  }
+
+  .section-footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 18px;
+    min-height: auto;
+  }
+
+  .section-footer-copy {
+    width: 100%;
+    margin: 18px 0 12px;
+  }
+
+  .section-footer-meta {
+    align-items: flex-start;
+    padding-bottom: 16px;
+  }
+
+  .section-footer-link {
+    margin-bottom: 16px;
+    margin-left: auto;
   }
 }
 

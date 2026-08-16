@@ -14,37 +14,42 @@ export const meta: MetaFunction = () => [
     {
         name: "description",
         content:
-            "Tiago Oliveira is a software developer building useful digital systems, products and web applications.",
+            "Tiago Oliveira is a full-stack developer building useful digital products, web applications and real-world systems.",
     },
 ];
-
-const heroTitle =
-    "I build digital systems people enjoy using and businesses depend on.";
 
 export default function Home() {
     const root = useRef<HTMLElement>(null);
     const hero = useRef<HTMLElement>(null);
-    const title = useRef<HTMLHeadingElement>(null);
-    const titleStage = useRef<HTMLDivElement>(null);
-    const revealWord = useRef<HTMLSpanElement>(null);
-    const visual = useRef<HTMLDivElement>(null);
+    const heroTitle = useRef<HTMLHeadingElement>(null);
+    const titleCopy = useRef<HTMLSpanElement>(null);
+    const systemsWord = useRef<HTMLSpanElement>(null);
+    const heroVisual = useRef<HTMLDivElement>(null);
     const visualCore = useRef<HTMLDivElement>(null);
-    const eyebrow = useRef<HTMLParagraphElement>(null);
+    const heroEyebrow = useRef<HTMLParagraphElement>(null);
+    const heroFooter = useRef<HTMLDivElement>(null);
     const header = useRef<HTMLElement>(null);
-    const footer = useRef<HTMLDivElement>(null);
     const progressCurrent = useRef<HTMLSpanElement>(null);
     const progressBar = useRef<HTMLSpanElement>(null);
     const stageLabel = useRef<HTMLSpanElement>(null);
+
+    const about = useRef<HTMLElement>(null);
+    const aboutEyebrow = useRef<HTMLParagraphElement>(null);
+    const aboutTitle = useRef<HTMLHeadingElement>(null);
+    const aboutCopy = useRef<HTMLParagraphElement>(null);
+    const aboutFooter = useRef<HTMLDivElement>(null);
+    const aboutProgress = useRef<HTMLSpanElement>(null);
 
     useGSAP(
         () => {
             if (
                 !hero.current ||
-                !title.current ||
-                !titleStage.current ||
-                !revealWord.current ||
-                !visual.current ||
-                !visualCore.current
+                !heroTitle.current ||
+                !titleCopy.current ||
+                !systemsWord.current ||
+                !heroVisual.current ||
+                !visualCore.current ||
+                !about.current
             ) {
                 return;
             }
@@ -68,25 +73,25 @@ export default function Home() {
                         gsap.set(
                             [
                                 header.current,
-                                eyebrow.current,
-                                footer.current,
-                                title.current,
-                                revealWord.current,
+                                heroEyebrow.current,
+                                heroFooter.current,
+                                heroTitle.current,
+                                systemsWord.current,
+                                aboutEyebrow.current,
+                                aboutTitle.current,
+                                aboutCopy.current,
+                                aboutFooter.current,
                             ],
                             {
                                 autoAlpha: 1,
+                                clearProps: "transform",
                             },
                         );
-
-                        gsap.set(revealWord.current, {
-                            yPercent: 0,
-                            scale: 1,
-                        });
 
                         return;
                     }
 
-                    const split = SplitText.create(title.current, {
+                    const split = SplitText.create(titleCopy.current, {
                         type: "words,chars",
                         wordsClass: "hero-word++",
                         charsClass: "hero-char",
@@ -100,8 +105,10 @@ export default function Home() {
                             });
 
                             return gsap.set(self.words, {
-                                yPercent: 0,
-                                rotateX: 0,
+                                x: 0,
+                                y: 0,
+                                rotate: 0,
+                                scale: 1,
                                 opacity: 1,
                                 filter: "blur(0px)",
                             });
@@ -113,9 +120,8 @@ export default function Home() {
 
                     gsap.set(
                         [
-                            header.current,
-                            eyebrow.current,
-                            footer.current,
+                            heroEyebrow.current,
+                            heroFooter.current,
                             progressCurrent.current,
                             progressBar.current,
                         ],
@@ -125,22 +131,33 @@ export default function Home() {
                         },
                     );
 
-                    gsap.set(revealWord.current, {
-                        autoAlpha: 0,
-                        yPercent: 45,
-                        scale: 0.74,
-                        rotate: -8,
+                    gsap.set(systemsWord.current, {
+                        transformOrigin: "50% 52%",
+                        willChange: "transform, opacity",
                     });
 
-                    gsap.set(visual.current, {
+                    gsap.set(heroVisual.current, {
+                        autoAlpha: 0,
                         scale: 0.72,
                         rotate: -18,
-                        autoAlpha: 0,
                     });
 
                     gsap.set(visualCore.current, {
                         scale: 0,
                     });
+
+                    gsap.set(
+                        [
+                            aboutEyebrow.current,
+                            aboutTitle.current,
+                            aboutCopy.current,
+                            aboutFooter.current,
+                        ],
+                        {
+                            autoAlpha: 0,
+                            y: 38,
+                        },
+                    );
 
                     const intro = gsap.timeline({
                         defaults: {
@@ -149,26 +166,27 @@ export default function Home() {
                     });
 
                     intro
-                        .to(header.current, {
-                            autoAlpha: 1,
-                            y: 0,
+                        .from(header.current, {
+                            autoAlpha: 0,
+                            y: -14,
                             duration: 0.65,
                         })
                         .to(
-                            eyebrow.current,
+                            heroEyebrow.current,
                             {
                                 autoAlpha: 1,
                                 y: 0,
                                 duration: 0.6,
                             },
-                            "-=0.35",
+                            "-=0.32",
                         )
                         .to(
-                            visual.current,
+                            heroVisual.current,
                             {
                                 autoAlpha: 1,
                                 scale: 1,
-                                duration: 1.2,
+                                rotate: -5,
+                                duration: 1.1,
                                 ease: "power4.out",
                             },
                             "-=0.45",
@@ -177,63 +195,73 @@ export default function Home() {
                             visualCore.current,
                             {
                                 scale: 1,
-                                duration: 0.9,
+                                duration: 0.85,
                                 ease: "back.out(1.8)",
                             },
-                            "-=0.75",
+                            "-=0.72",
                         )
                         .from(
                             words,
                             {
-                                yPercent: 120,
-                                rotateX: -85,
+                                yPercent: 115,
+                                rotateX: -80,
                                 opacity: 0,
+                                duration: 0.95,
                                 stagger: {
-                                    amount: 0.6,
+                                    amount: 0.48,
                                     from: "start",
                                 },
-                                duration: 1.05,
                                 ease: "power4.out",
                             },
-                            "-=0.75",
+                            "-=0.72",
+                        )
+                        .from(
+                            systemsWord.current,
+                            {
+                                yPercent: 115,
+                                rotateX: -80,
+                                opacity: 0,
+                                duration: 0.9,
+                                ease: "power4.out",
+                            },
+                            "-=0.78",
                         )
                         .to(
-                            footer.current,
+                            heroFooter.current,
                             {
                                 autoAlpha: 1,
                                 y: 0,
                                 duration: 0.6,
                             },
-                            "-=0.75",
+                            "-=0.58",
                         )
                         .to(
                             [progressCurrent.current, progressBar.current],
                             {
                                 autoAlpha: 1,
                                 y: 0,
-                                duration: 0.5,
+                                duration: 0.45,
                             },
-                            "-=0.4",
+                            "-=0.42",
                         );
 
-                    const scrollTimeline = gsap.timeline({
+                    const heroTimeline = gsap.timeline({
                         defaults: {
                             ease: "none",
                         },
                         scrollTrigger: {
                             trigger: hero.current,
                             start: "top top",
-                            end: desktop ? "+=300%" : "+=220%",
+                            end: desktop ? "+=270%" : "+=220%",
                             pin: true,
                             pinSpacing: true,
-                            scrub: 0.7,
+                            scrub: 0.65,
                             anticipatePin: 1,
                             invalidateOnRefresh: true,
                             onUpdate: (self) => {
-                                const progress = Math.round(self.progress * 100);
                                 const section = Math.min(
-                                    5,
-                                    Math.max(1, Math.ceil(self.progress * 5)),
+                                    2,
+                                    Math.max(1, Math.ceil(self.progress * 2)),
                                 );
 
                                 if (progressCurrent.current) {
@@ -246,87 +274,72 @@ export default function Home() {
                                 if (progressBar.current) {
                                     progressBar.current.style.setProperty(
                                         "--progress",
-                                        `${progress}%`,
+                                        `${Math.round(self.progress * 100)}%`,
                                     );
                                 }
 
                                 if (stageLabel.current) {
-                                    const labels = [
-                                        "Introduction",
-                                        "Discovery",
-                                        "Systems",
-                                        "Interaction",
-                                        "Delivery",
-                                    ];
-
                                     stageLabel.current.textContent =
-                                        labels[Math.min(labels.length - 1, section - 1)];
+                                        self.progress < 0.42 ? "Introduction" : "About me";
                                 }
                             },
                         },
                     });
 
-                    scrollTimeline
-                        .addLabel("intro", 0)
+                    heroTimeline
+                        .addLabel("departure", 0)
                         .to(
-                            eyebrow.current,
+                            heroEyebrow.current,
                             {
-                                xPercent: -120,
+                                xPercent: -115,
                                 autoAlpha: 0,
                             },
-                            "intro",
+                            "departure",
                         )
                         .to(
-                            footer.current,
+                            heroFooter.current,
                             {
-                                yPercent: 125,
+                                yPercent: 140,
                                 autoAlpha: 0,
                             },
-                            "intro",
+                            "departure",
                         )
                         .to(
-                            header.current,
+                            heroVisual.current,
                             {
-                                yPercent: -120,
-                                autoAlpha: 0,
+                                rotate: 55,
+                                scale: 1.2,
+                                autoAlpha: 0.5,
                             },
-                            "intro",
+                            "departure",
                         )
-                        .to(
-                            visual.current,
-                            {
-                                scale: 1.1,
-                                rotate: 10,
-                            },
-                            "intro",
-                        )
-                        .addLabel("split", 0.18)
+                        .addLabel("split", 0.14)
                         .to(
                             words,
                             {
                                 x: (index) =>
                                     (index % 2 === 0 ? -1 : 1) *
-                                    gsap.utils.mapRange(0, words.length - 1, 50, 230, index),
+                                    gsap.utils.mapRange(0, words.length - 1, 55, 250, index),
                                 y: (index) =>
-                                    gsap.utils.mapRange(0, words.length - 1, -120, 180, index),
+                                    gsap.utils.mapRange(0, words.length - 1, -130, 185, index),
                                 rotate: (index) =>
                                     gsap.utils.mapRange(
                                         0,
                                         words.length - 1,
-                                        -11,
-                                        14,
+                                        -14,
+                                        17,
                                         index,
                                     ),
                                 scale: (index) =>
                                     gsap.utils.mapRange(
                                         0,
                                         words.length - 1,
-                                        0.92,
-                                        1.18,
+                                        0.84,
+                                        1.14,
                                         index,
                                     ),
                                 opacity: 0,
-                                filter: "blur(9px)",
+                                filter: "blur(10px)",
                                 stagger: {
                                     each: 0.015,
                                     from: "center",
@@ -337,96 +350,139 @@ export default function Home() {
                         .to(
                             chars,
                             {
-                                y: "random(-65, 65)",
-                                x: "random(-35, 35)",
-                                rotate: "random(-25, 25)",
+                                x: "random(-38, 38)",
+                                y: "random(-68, 68)",
+                                rotate: "random(-28, 28)",
                                 stagger: {
-                                    each: 0.003,
+                                    each: 0.002,
                                     from: "random",
                                 },
                             },
                             "split",
                         )
-                        .addLabel("systems", 0.42)
+                        .addLabel("systems-focus", 0.4)
                         .to(
-                            visual.current,
+                            heroVisual.current,
                             {
-                                rotate: 145,
-                                scale: 1.34,
+                                rotate: 180,
+                                scale: 1.72,
+                                autoAlpha: 0.18,
                             },
-                            "systems",
+                            "systems-focus",
                         )
                         .to(
                             visualCore.current,
                             {
-                                scale: 1.65,
-                                duration: 0.18,
+                                scale: 2.25,
                             },
-                            "systems",
+                            "systems-focus",
                         )
                         .to(
-                            revealWord.current,
+                            systemsWord.current,
+                            {
+                                scale: desktop ? 4.1 : 2.1,
+                                xPercent: desktop ? -15 : 0,
+                                yPercent: desktop ? -18 : -35,
+                                letterSpacing: "-0.075em",
+                                duration: 0.25,
+                                ease: "power2.inOut",
+                            },
+                            "systems-focus",
+                        )
+                        .to(
+                            heroTitle.current,
+                            {
+                                color: "#f0eee7",
+                            },
+                            "systems-focus+=0.05",
+                        )
+                        .addLabel("handoff", 0.7)
+                        .to(
+                            systemsWord.current,
+                            {
+                                scale: desktop ? 7.5 : 3.25,
+                                xPercent: desktop ? -12 : 0,
+                                yPercent: desktop ? -22 : -40,
+                                autoAlpha: 0,
+                            },
+                            "handoff",
+                        )
+                        .to(
+                            heroVisual.current,
+                            {
+                                scale: 2.4,
+                                autoAlpha: 0,
+                            },
+                            "handoff",
+                        )
+                        .to(
+                            hero.current,
+                            {
+                                backgroundColor: "#1c211c",
+                            },
+                            "handoff",
+                        );
+
+                    const aboutTimeline = gsap.timeline({
+                        defaults: {
+                            ease: "power3.out",
+                        },
+                        scrollTrigger: {
+                            trigger: about.current,
+                            start: "top 74%",
+                            end: "top 25%",
+                            scrub: 0.8,
+                            invalidateOnRefresh: true,
+                            onUpdate: (self) => {
+                                if (aboutProgress.current) {
+                                    aboutProgress.current.style.setProperty(
+                                        "--progress",
+                                        `${Math.round(self.progress * 100)}%`,
+                                    );
+                                }
+                            },
+                        },
+                    });
+
+                    aboutTimeline
+                        .to(aboutEyebrow.current, {
+                            autoAlpha: 1,
+                            y: 0,
+                            duration: 0.35,
+                        })
+                        .to(
+                            aboutTitle.current,
                             {
                                 autoAlpha: 1,
-                                yPercent: 0,
-                                scale: 1,
-                                rotate: 0,
-                                duration: 0.2,
-                                ease: "power3.out",
+                                y: 0,
+                                duration: 0.45,
                             },
-                            "systems",
+                            "-=0.16",
                         )
                         .to(
-                            revealWord.current,
+                            aboutCopy.current,
                             {
-                                letterSpacing: "0.03em",
-                                duration: 0.14,
+                                autoAlpha: 1,
+                                y: 0,
+                                duration: 0.35,
                             },
-                            "systems+=0.14",
-                        )
-                        .addLabel("detail", 0.66)
-                        .to(
-                            revealWord.current,
-                            {
-                                scale: 0.72,
-                                yPercent: -65,
-                                autoAlpha: 0,
-                            },
-                            "detail",
+                            "-=0.18",
                         )
                         .to(
-                            visual.current,
+                            aboutFooter.current,
                             {
-                                rotate: 250,
-                                scale: 1.72,
-                                xPercent: 20,
-                                yPercent: -18,
+                                autoAlpha: 1,
+                                y: 0,
+                                duration: 0.35,
                             },
-                            "detail",
-                        )
-                        .to(
-                            titleStage.current,
-                            {
-                                scale: 0.82,
-                                autoAlpha: 0,
-                                transformOrigin: "50% 50%",
-                            },
-                            "detail",
-                        )
-                        .addLabel("outro", 0.9)
-                        .to(
-                            visual.current,
-                            {
-                                autoAlpha: 0,
-                                scale: 2.1,
-                            },
-                            "outro",
+                            "-=0.2",
                         );
 
                     return () => {
                         split.revert();
                         intro.kill();
-                        scrollTimeline.kill();
+                        heroTimeline.kill();
+                        aboutTimeline.kill();
                     };
                 },
             );
@@ -440,7 +496,7 @@ export default function Home() {
         <main ref={root} className="site-shell">
             <section ref={hero} className="hero hero-scroll" aria-labelledby="hero-title">
                 <div className="hero-background" aria-hidden="true">
-                    <div ref={visual} className="hero-visual">
+                    <div ref={heroVisual} className="hero-visual">
                         <span className="hero-orbit hero-orbit-one" />
                         <span className="hero-orbit hero-orbit-two" />
                         <span className="hero-orbit hero-orbit-three" />
@@ -460,16 +516,16 @@ export default function Home() {
                 </div>
 
                 <header ref={header} className="site-header">
-                    <a className="brand" href="/" aria-label="Tiago Oliveira — início">
+                    <a className="brand" href="/" aria-label="Tiago Oliveira — home">
                         <span className="brand-mark">TO</span>
                         <span className="brand-name">Tiago Oliveira</span>
                     </a>
 
-                    <nav className="main-nav" aria-label="Navegação principal">
-                        <a href="#about">Sobre</a>
-                        <a href="#services">O que faço</a>
-                        <a href="/projects">Projetos</a>
-                        <a href="#contact">Contacto</a>
+                    <nav className="main-nav" aria-label="Primary navigation">
+                        <a href="#about">About</a>
+                        <a href="#services">What I do</a>
+                        <a href="/projects">Projects</a>
+                        <a href="#contact">Contact</a>
                         <a className="portal-link" href="/portal">
                             <span aria-hidden="true">↗</span>
                             Portal
@@ -485,26 +541,26 @@ export default function Home() {
                     <span>05</span>
                 </div>
 
-                <div ref={titleStage} className="hero-content">
-                    <p ref={eyebrow} className="hero-eyebrow">
+                <div className="hero-content">
+                    <p ref={heroEyebrow} className="hero-eyebrow">
                         Software development <span>·</span> Portugal
                     </p>
 
-                    <h1 ref={title} id="hero-title" className="hero-title">
-                        {heroTitle}
+                    <h1 ref={heroTitle} id="hero-title" className="hero-title">
+            <span ref={titleCopy}>
+              I build digital products and
+            </span>{" "}
+                        <span ref={systemsWord} className="hero-systems-word">
+              digital systems
+            </span>{" "}
+                        <span className="hero-title-ending">people enjoy using.</span>
                     </h1>
                 </div>
 
-                <div className="hero-reveal" aria-hidden="true">
-          <span ref={revealWord} className="hero-reveal-word">
-            SYSTEMS
-          </span>
-                </div>
-
-                <div ref={footer} className="hero-footer">
+                <div ref={heroFooter} className="hero-footer">
                     <p className="hero-description">
-                        From booking flows and support portals to real-time data systems,
-                        I design technology that works in the real world.
+                        Web applications, booking platforms, support portals and real-time
+                        systems built around actual operational needs.
                     </p>
 
                     <div className="hero-stage">
@@ -513,7 +569,7 @@ export default function Home() {
                     </div>
 
                     <a className="scroll-cue" href="#about">
-                        <span>Explore my work</span>
+                        <span>Meet me</span>
                         <span className="scroll-arrow" aria-hidden="true">
               ↓
             </span>
@@ -521,23 +577,89 @@ export default function Home() {
                 </div>
             </section>
 
-            <section id="about" className="content-section content-section-light">
-                <p className="section-kicker">02 / About</p>
-                <h2>I turn difficult requirements into software people can trust.</h2>
-                <p className="section-copy">
-                    I work across product thinking, interface design and full-stack
-                    development to create products that behave well beyond the happy path.
-                </p>
+            <section
+                ref={about}
+                id="about"
+                className="content-section about-section"
+                aria-labelledby="about-title"
+            >
+                <div className="section-header">
+                    <p ref={aboutEyebrow} className="section-kicker">
+                        02 / About me
+                    </p>
+
+                    <div className="section-progress" aria-hidden="true">
+                        <span>02</span>
+                        <span className="section-progress-track">
+              <span ref={aboutProgress} className="section-progress-fill" />
+            </span>
+                        <span>05</span>
+                    </div>
+                </div>
+
+                <div className="about-content">
+                    <h2 ref={aboutTitle} id="about-title">
+                        Code comes second. First, I bridge the gap between human needs and
+                        business goals.
+                    </h2>
+
+                    <p ref={aboutCopy} className="about-copy">
+                        I&apos;m Tiago Oliveira, a full-stack developer based in Portugal.
+                        I combine product thinking, interface design and engineering to
+                        turn complex workflows into practical digital experiences.
+                    </p>
+                </div>
+
+                <div ref={aboutFooter} className="section-footer">
+                    <p className="section-footer-copy">
+                        I care about the detail behind a good product: clear flows,
+                        reliable systems and software that stays useful after launch.
+                    </p>
+
+                    <div className="section-footer-meta">
+                        <span>Based in</span>
+                        <span>Viana do Castelo, PT</span>
+                    </div>
+
+                    <a className="section-footer-link" href="#services">
+                        <span>What I do next</span>
+                        <span aria-hidden="true">↓</span>
+                    </a>
+                </div>
             </section>
 
-            <section id="services" className="content-section content-section-dark">
-                <p className="section-kicker">03 / What I do</p>
-                <h2>Web products, internal systems and connected experiences.</h2>
+            <section id="services" className="content-section services-section">
+                <div className="section-header">
+                    <p className="section-kicker">03 / What I do</p>
+                    <div className="section-progress" aria-hidden="true">
+                        <span>03</span>
+                        <span className="section-progress-track">
+              <span className="section-progress-fill section-progress-static" />
+            </span>
+                        <span>05</span>
+                    </div>
+                </div>
+
+                <div className="about-content">
+                    <h2>Products, systems and interfaces made for real work.</h2>
+                </div>
             </section>
 
-            <section id="contact" className="content-section content-section-light">
-                <p className="section-kicker">04 / Contact</p>
-                <h2>Have a difficult product problem?</h2>
+            <section id="contact" className="content-section contact-section">
+                <div className="section-header">
+                    <p className="section-kicker">04 / Contact</p>
+                    <div className="section-progress" aria-hidden="true">
+                        <span>04</span>
+                        <span className="section-progress-track">
+              <span className="section-progress-fill section-progress-static" />
+            </span>
+                        <span>05</span>
+                    </div>
+                </div>
+
+                <div className="about-content">
+                    <h2>Have a difficult product problem worth solving?</h2>
+                </div>
             </section>
         </main>
     );
