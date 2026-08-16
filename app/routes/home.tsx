@@ -278,7 +278,7 @@ export default function Home() {
           <AnimatedSection>
             <div className="flex items-center gap-4 mb-6">
               <img
-                src="/profile.jpg"
+                src="/media/profile.webp"
                 alt="Tiago Oliveira"
                 className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl object-cover flex-shrink-0 shadow-lg ring-2 ring-blue-100 dark:ring-blue-900"
               />

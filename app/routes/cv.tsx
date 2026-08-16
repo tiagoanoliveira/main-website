@@ -143,7 +143,7 @@ export default function CV() {
                 {/* ── Header ── */}
                 <div className="mt-8 mb-12 flex items-center gap-5">
                     <img
-                        src="/profile.jpg"
+                        src="/media/profile.webp"
                         alt="Tiago Oliveira"
                         className="w-20 h-20 rounded-2xl object-cover ring-2 ring-blue-100 dark:ring-blue-900 shadow-lg flex-shrink-0"
                     />
