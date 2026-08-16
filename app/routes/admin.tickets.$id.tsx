@@ -4,6 +4,7 @@ import {
     getTicketById, getTicketMessages, createTicketMessage,
     updateTicketStatus, getAttachments, createAttachment, deleteAttachment,
     getSiteById, updateTicketMessage, deleteTicketMessage, getTicketMessageById,
+    type Attachment,
 } from "~/lib/db";
 import StatusBadge from "~/components/ui/StatusBadge";
 import Attachments from "~/components/ui/Attachments";
@@ -181,7 +182,7 @@ function MessageBubble({
     msg, atts, viewerRole, senderLabel,
 }: {
     msg: { id: number; sender: string; message: string; created_at: string; edited_at?: string | null };
-    atts: { id: number; r2_key: string; file_name: string; file_type: string }[];
+    atts: Attachment[];
     viewerRole: "admin" | "owner";
     senderLabel: string;
 }) {

@@ -242,7 +242,7 @@ export default function SupportForm() {
     const result     = useActionData<typeof action>();
     const navigation = useNavigation();
     const isLoading  = navigation.state === "submitting";
-    const errors     = result?.errors ?? {};
+    const errors     = (result?.errors ?? {}) as Record<string, string>;
 
     const [selectedCategory, setSelectedCategory] = useState("");
     const brandColor = site.brand_color ?? "#2563eb";
