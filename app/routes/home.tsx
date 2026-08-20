@@ -20,6 +20,9 @@ export const meta: MetaFunction = () => [
 
 export default function Home() {
     const root = useRef<HTMLElement>(null);
+
+    const header = useRef<HTMLElement>(null);
+
     const hero = useRef<HTMLElement>(null);
     const heroTitle = useRef<HTMLHeadingElement>(null);
     const titleCopy = useRef<HTMLSpanElement>(null);
@@ -28,17 +31,19 @@ export default function Home() {
     const visualCore = useRef<HTMLDivElement>(null);
     const heroEyebrow = useRef<HTMLParagraphElement>(null);
     const heroFooter = useRef<HTMLDivElement>(null);
-    const header = useRef<HTMLElement>(null);
     const progressCurrent = useRef<HTMLSpanElement>(null);
     const progressBar = useRef<HTMLSpanElement>(null);
     const stageLabel = useRef<HTMLSpanElement>(null);
 
+    const aboutWrap = useRef<HTMLDivElement>(null);
     const about = useRef<HTMLElement>(null);
-    const aboutEyebrow = useRef<HTMLParagraphElement>(null);
     const aboutTitle = useRef<HTMLHeadingElement>(null);
     const aboutCopy = useRef<HTMLParagraphElement>(null);
+    const aboutActivity = useRef<HTMLDivElement>(null);
     const aboutFooter = useRef<HTMLDivElement>(null);
-    const aboutProgress = useRef<HTMLSpanElement>(null);
+
+    const servicesWrap = useRef<HTMLDivElement>(null);
+    const services = useRef<HTMLElement>(null);
 
     useGSAP(
         () => {
@@ -49,7 +54,10 @@ export default function Home() {
                 !systemsWord.current ||
                 !heroVisual.current ||
                 !visualCore.current ||
-                !about.current
+                !aboutWrap.current ||
+                !about.current ||
+                !servicesWrap.current ||
+                !services.current
             ) {
                 return;
             }
@@ -59,13 +67,11 @@ export default function Home() {
             media.add(
                 {
                     desktop: "(min-width: 761px)",
-                    mobile: "(max-width: 760px)",
                     reducedMotion: "(prefers-reduced-motion: reduce)",
                 },
                 (context) => {
-                    const { desktop, reducedMotion } = context.conditions as {
+                    const { reducedMotion } = context.conditions as {
                         desktop: boolean;
-                        mobile: boolean;
                         reducedMotion: boolean;
                     };
 
@@ -77,10 +83,12 @@ export default function Home() {
                                 heroFooter.current,
                                 heroTitle.current,
                                 systemsWord.current,
-                                aboutEyebrow.current,
+                                about.current,
                                 aboutTitle.current,
                                 aboutCopy.current,
+                                aboutActivity.current,
                                 aboutFooter.current,
+                                services.current,
                             ],
                             {
                                 autoAlpha: 1,
@@ -118,88 +126,42 @@ export default function Home() {
                     const words = split.words;
                     const chars = split.chars;
 
-                    gsap.set(
-                        [
-                            heroEyebrow.current,
-                            heroFooter.current,
-                            progressCurrent.current,
-                            progressBar.current,
-                        ],
-                        {
-                            autoAlpha: 0,
-                            y: 18,
-                        },
-                    );
+                    // Header is fixed and never touched by scroll — animate once, then leave alone.
+                    gsap.set(header.current, { autoAlpha: 0, y: -14 });
+
+                    gsap.set([heroEyebrow.current, heroFooter.current, progressCurrent.current, progressBar.current], {
+                        autoAlpha: 0,
+                        y: 18,
+                    });
 
                     gsap.set(systemsWord.current, {
+                        autoAlpha: 1,
                         transformOrigin: "50% 52%",
                         willChange: "transform, opacity",
                     });
 
-                    gsap.set(heroVisual.current, {
+                    gsap.set(heroVisual.current, { autoAlpha: 0, scale: 0.72, rotate: -18 });
+                    gsap.set(visualCore.current, { scale: 0 });
+
+                    gsap.set(about.current, { xPercent: 100 });
+                    gsap.set([aboutTitle.current, aboutCopy.current, aboutActivity.current, aboutFooter.current], {
                         autoAlpha: 0,
-                        scale: 0.72,
-                        rotate: -18,
+                        y: 28,
                     });
 
-                    gsap.set(visualCore.current, {
-                        scale: 0,
-                    });
+                    gsap.set(services.current, { yPercent: 100 });
 
-                    gsap.set(
-                        [
-                            aboutEyebrow.current,
-                            aboutTitle.current,
-                            aboutCopy.current,
-                            aboutFooter.current,
-                        ],
-                        {
-                            autoAlpha: 0,
-                            y: 38,
-                        },
-                    );
-
-                    const intro = gsap.timeline({
-                        defaults: {
-                            ease: "power3.out",
-                        },
-                    });
+                    const intro = gsap.timeline({ defaults: { ease: "power3.out" } });
 
                     intro
-                        .from(header.current, {
-                            autoAlpha: 0,
-                            y: -14,
-                            duration: 0.65,
-                        })
-                        .to(
-                            heroEyebrow.current,
-                            {
-                                autoAlpha: 1,
-                                y: 0,
-                                duration: 0.6,
-                            },
-                            "-=0.32",
-                        )
+                        .to(header.current, { autoAlpha: 1, y: 0, duration: 0.65 })
+                        .to(heroEyebrow.current, { autoAlpha: 1, y: 0, duration: 0.6 }, "-=0.35")
                         .to(
                             heroVisual.current,
-                            {
-                                autoAlpha: 1,
-                                scale: 1,
-                                rotate: -5,
-                                duration: 1.1,
-                                ease: "power4.out",
-                            },
+                            { autoAlpha: 1, scale: 1, rotate: -5, duration: 1.1, ease: "power4.out" },
                             "-=0.45",
                         )
-                        .to(
-                            visualCore.current,
-                            {
-                                scale: 1,
-                                duration: 0.85,
-                                ease: "back.out(1.8)",
-                            },
-                            "-=0.72",
-                        )
+                        .to(visualCore.current, { scale: 1, duration: 0.85, ease: "back.out(1.8)" }, "-=0.72")
                         .from(
                             words,
                             {
@@ -207,143 +169,85 @@ export default function Home() {
                                 rotateX: -80,
                                 opacity: 0,
                                 duration: 0.95,
-                                stagger: {
-                                    amount: 0.48,
-                                    from: "start",
-                                },
+                                stagger: { amount: 0.48, from: "start" },
                                 ease: "power4.out",
                             },
                             "-=0.72",
                         )
-                        .from(
-                            systemsWord.current,
-                            {
-                                yPercent: 115,
-                                rotateX: -80,
-                                opacity: 0,
-                                duration: 0.9,
-                                ease: "power4.out",
-                            },
-                            "-=0.78",
-                        )
-                        .to(
-                            heroFooter.current,
-                            {
-                                autoAlpha: 1,
-                                y: 0,
-                                duration: 0.6,
-                            },
-                            "-=0.58",
-                        )
+                        .to(heroFooter.current, { autoAlpha: 1, y: 0, duration: 0.6 }, "-=0.58")
                         .to(
                             [progressCurrent.current, progressBar.current],
-                            {
-                                autoAlpha: 1,
-                                y: 0,
-                                duration: 0.45,
-                            },
+                            { autoAlpha: 1, y: 0, duration: 0.45 },
                             "-=0.42",
                         );
 
+                    // Idle "radar" animation — always running, independent from scroll direction.
+                    gsap.to(".hero-radar-sweep", {
+                        rotate: 360,
+                        duration: 5.5,
+                        repeat: -1,
+                        ease: "none",
+                    });
+
+                    gsap.to(".hero-radar-node", {
+                        scale: 1.6,
+                        opacity: 0.15,
+                        duration: 1.4,
+                        repeat: -1,
+                        yoyo: true,
+                        ease: "sine.inOut",
+                        stagger: { each: 0.5, repeat: -1 },
+                    });
+
+                    gsap.to(visualCore.current, {
+                        boxShadow: "0 0 0 20px rgba(24, 26, 24, 0.03)",
+                        duration: 1.6,
+                        repeat: -1,
+                        yoyo: true,
+                        ease: "sine.inOut",
+                    });
+
+                    // Hero morph timeline — only elements INSIDE the hero pin are touched.
                     const heroTimeline = gsap.timeline({
-                        defaults: {
-                            ease: "none",
-                        },
+                        defaults: { ease: "none" },
                         scrollTrigger: {
                             trigger: hero.current,
                             start: "top top",
-                            end: desktop ? "+=270%" : "+=220%",
+                            end: "+=270%",
                             pin: true,
                             pinSpacing: true,
                             scrub: 0.65,
                             anticipatePin: 1,
                             invalidateOnRefresh: true,
                             onUpdate: (self) => {
-                                const section = Math.min(
-                                    2,
-                                    Math.max(1, Math.ceil(self.progress * 2)),
-                                );
-
-                                if (progressCurrent.current) {
-                                    progressCurrent.current.textContent = String(section).padStart(
-                                        2,
-                                        "0",
-                                    );
+                                if (stageLabel.current) {
+                                    stageLabel.current.textContent =
+                                        self.progress < 0.5 ? "Introduction" : "About me";
                                 }
-
                                 if (progressBar.current) {
                                     progressBar.current.style.setProperty(
                                         "--progress",
                                         `${Math.round(self.progress * 100)}%`,
                                     );
                                 }
-
-                                if (stageLabel.current) {
-                                    stageLabel.current.textContent =
-                                        self.progress < 0.42 ? "Introduction" : "About me";
-                                }
                             },
                         },
                     });
 
                     heroTimeline
-                        .addLabel("departure", 0)
-                        .to(
-                            heroEyebrow.current,
-                            {
-                                xPercent: -115,
-                                autoAlpha: 0,
-                            },
-                            "departure",
-                        )
-                        .to(
-                            heroFooter.current,
-                            {
-                                yPercent: 140,
-                                autoAlpha: 0,
-                            },
-                            "departure",
-                        )
-                        .to(
-                            heroVisual.current,
-                            {
-                                rotate: 55,
-                                scale: 1.2,
-                                autoAlpha: 0.5,
-                            },
-                            "departure",
-                        )
-                        .addLabel("split", 0.14)
+                        .addLabel("split", 0)
                         .to(
                             words,
                             {
                                 x: (index) =>
                                     (index % 2 === 0 ? -1 : 1) *
                                     gsap.utils.mapRange(0, words.length - 1, 55, 250, index),
-                                y: (index) =>
-                                    gsap.utils.mapRange(0, words.length - 1, -130, 185, index),
-                                rotate: (index) =>
-                                    gsap.utils.mapRange(
-                                        0,
-                                        words.length - 1,
-                                        -14,
-                                        17,
-                                        index,
-                                    ),
-                                scale: (index) =>
-                                    gsap.utils.mapRange(
-                                        0,
-                                        words.length - 1,
-                                        0.84,
-                                        1.14,
-                                        index,
-                                    ),
+                                y: (index) => gsap.utils.mapRange(0, words.length - 1, -130, 185, index),
+                                rotate: (index) => gsap.utils.mapRange(0, words.length - 1, -14, 17, index),
+                                scale: (index) => gsap.utils.mapRange(0, words.length - 1, 0.84, 1.14, index),
                                 opacity: 0,
                                 filter: "blur(10px)",
-                                stagger: {
-                                    each: 0.015,
-                                    from: "center",
-                                },
+                                stagger: { each: 0.015, from: "center" },
                             },
                             "split",
                         )
@@ -353,136 +257,77 @@ export default function Home() {
                                 x: "random(-38, 38)",
                                 y: "random(-68, 68)",
                                 rotate: "random(-28, 28)",
-                                stagger: {
-                                    each: 0.002,
-                                    from: "random",
-                                },
+                                stagger: { each: 0.002, from: "random" },
                             },
                             "split",
                         )
                         .addLabel("systems-focus", 0.4)
-                        .to(
-                            heroVisual.current,
-                            {
-                                rotate: 180,
-                                scale: 1.72,
-                                autoAlpha: 0.18,
-                            },
-                            "systems-focus",
-                        )
-                        .to(
-                            visualCore.current,
-                            {
-                                scale: 2.25,
-                            },
-                            "systems-focus",
-                        )
+                        .to(heroVisual.current, { rotate: 180, scale: 1.72, autoAlpha: 0.18 }, "systems-focus")
+                        .to(visualCore.current, { scale: 2.25 }, "systems-focus")
                         .to(
                             systemsWord.current,
                             {
-                                scale: desktop ? 4.1 : 2.1,
-                                xPercent: desktop ? -15 : 0,
-                                yPercent: desktop ? -18 : -35,
+                                scale: 4.1,
+                                xPercent: -15,
+                                yPercent: -18,
                                 letterSpacing: "-0.075em",
                                 duration: 0.25,
                                 ease: "power2.inOut",
                             },
                             "systems-focus",
                         )
-                        .to(
-                            heroTitle.current,
-                            {
-                                color: "#f0eee7",
-                            },
-                            "systems-focus+=0.05",
-                        )
-                        .addLabel("handoff", 0.7)
+                        .to(heroTitle.current, { color: "#f0eee7" }, "systems-focus+=0.05")
+                        .addLabel("handoff", 0.72)
                         .to(
                             systemsWord.current,
-                            {
-                                scale: desktop ? 7.5 : 3.25,
-                                xPercent: desktop ? -12 : 0,
-                                yPercent: desktop ? -22 : -40,
-                                autoAlpha: 0,
-                            },
+                            { scale: 7.5, xPercent: -12, yPercent: -22, autoAlpha: 0 },
                             "handoff",
                         )
-                        .to(
-                            heroVisual.current,
-                            {
-                                scale: 2.4,
-                                autoAlpha: 0,
-                            },
-                            "handoff",
-                        )
-                        .to(
-                            hero.current,
-                            {
-                                backgroundColor: "#1c211c",
-                            },
-                            "handoff",
-                        );
+                        .to(heroVisual.current, { scale: 2.4, autoAlpha: 0 }, "handoff")
+                        .to(hero.current, { backgroundColor: "#1c211c" }, "handoff");
 
-                    const aboutTimeline = gsap.timeline({
-                        defaults: {
-                            ease: "power3.out",
-                        },
+                    // About: sticky slide-in from the right, synced 1:1 with the wrapper's scroll length.
+                    const aboutSlide = gsap.timeline({
+                        defaults: { ease: "none" },
                         scrollTrigger: {
-                            trigger: about.current,
-                            start: "top 74%",
-                            end: "top 25%",
-                            scrub: 0.8,
+                            trigger: aboutWrap.current,
+                            start: "top top",
+                            end: "bottom top",
+                            scrub: 0.5,
                             invalidateOnRefresh: true,
-                            onUpdate: (self) => {
-                                if (aboutProgress.current) {
-                                    aboutProgress.current.style.setProperty(
-                                        "--progress",
-                                        `${Math.round(self.progress * 100)}%`,
-                                    );
-                                }
-                            },
                         },
                     });
 
-                    aboutTimeline
-                        .to(aboutEyebrow.current, {
-                            autoAlpha: 1,
-                            y: 0,
-                            duration: 0.35,
-                        })
+                    aboutSlide
+                        .to(about.current, { xPercent: 0, duration: 0.55, ease: "power2.out" })
                         .to(
-                            aboutTitle.current,
-                            {
-                                autoAlpha: 1,
-                                y: 0,
-                                duration: 0.45,
-                            },
-                            "-=0.16",
-                        )
-                        .to(
-                            aboutCopy.current,
-                            {
-                                autoAlpha: 1,
-                                y: 0,
-                                duration: 0.35,
-                            },
-                            "-=0.18",
-                        )
-                        .to(
-                            aboutFooter.current,
-                            {
-                                autoAlpha: 1,
-                                y: 0,
-                                duration: 0.35,
-                            },
+                            [aboutTitle.current, aboutCopy.current],
+                            { autoAlpha: 1, y: 0, duration: 0.25 },
                             "-=0.2",
-                        );
+                        )
+                        .to(aboutActivity.current, { autoAlpha: 1, y: 0, duration: 0.25 }, "-=0.15")
+                        .to(aboutFooter.current, { autoAlpha: 1, y: 0, duration: 0.2 }, "-=0.12");
+
+                    // Services: sticky slide-in from below, same technique.
+                    const servicesSlide = gsap.timeline({
+                        defaults: { ease: "none" },
+                        scrollTrigger: {
+                            trigger: servicesWrap.current,
+                            start: "top top",
+                            end: "bottom top",
+                            scrub: 0.5,
+                            invalidateOnRefresh: true,
+                        },
+                    });
+
+                    servicesSlide.to(services.current, { yPercent: 0, duration: 1, ease: "power2.out" });
 
                     return () => {
                         split.revert();
                         intro.kill();
                         heroTimeline.kill();
-                        aboutTimeline.kill();
+                        aboutSlide.kill();
+                        servicesSlide.kill();
                     };
                 },
             );
@@ -494,44 +339,41 @@ export default function Home() {
 
     return (
         <main ref={root} className="site-shell">
+            <header ref={header} className="site-nav">
+                <a className="brand" href="/" aria-label="Tiago Oliveira — home">
+                    <span className="brand-mark">TO</span>
+                    <span className="brand-name">Tiago Oliveira</span>
+                </a>
+
+                <nav className="main-nav" aria-label="Primary navigation">
+                    <a href="#about">About</a>
+                    <a href="#services">What I do</a>
+                    <a href="/projects">Projects</a>
+                    <a href="#contact">Contact</a>
+                    <a className="portal-link" href="/portal">
+                        <span aria-hidden="true">↗</span>
+                        Portal
+                    </a>
+                </nav>
+            </header>
+
             <section ref={hero} className="hero hero-scroll" aria-labelledby="hero-title">
                 <div className="hero-background" aria-hidden="true">
                     <div ref={heroVisual} className="hero-visual">
+                        <span className="hero-radar-sweep" />
                         <span className="hero-orbit hero-orbit-one" />
                         <span className="hero-orbit hero-orbit-two" />
                         <span className="hero-orbit hero-orbit-three" />
-                        <span className="hero-orbit hero-orbit-four" />
 
-                        <span className="hero-grid hero-grid-horizontal" />
-                        <span className="hero-grid hero-grid-vertical" />
-
-                        <span className="hero-dot hero-dot-one" />
-                        <span className="hero-dot hero-dot-two" />
-                        <span className="hero-dot hero-dot-three" />
+                        <span className="hero-radar-node hero-radar-node-1" />
+                        <span className="hero-radar-node hero-radar-node-2" />
+                        <span className="hero-radar-node hero-radar-node-3" />
 
                         <div ref={visualCore} className="hero-core">
                             <span>TO</span>
                         </div>
                     </div>
                 </div>
-
-                <header ref={header} className="site-header">
-                    <a className="brand" href="/" aria-label="Tiago Oliveira — home">
-                        <span className="brand-mark">TO</span>
-                        <span className="brand-name">Tiago Oliveira</span>
-                    </a>
-
-                    <nav className="main-nav" aria-label="Primary navigation">
-                        <a href="#about">About</a>
-                        <a href="#services">What I do</a>
-                        <a href="/projects">Projects</a>
-                        <a href="#contact">Contact</a>
-                        <a className="portal-link" href="/portal">
-                            <span aria-hidden="true">↗</span>
-                            Portal
-                        </a>
-                    </nav>
-                </header>
 
                 <div className="hero-progress" aria-live="polite">
                     <span ref={progressCurrent}>01</span>
@@ -547,20 +389,18 @@ export default function Home() {
                     </p>
 
                     <h1 ref={heroTitle} id="hero-title" className="hero-title">
-            <span ref={titleCopy}>
-              I build digital products and
-            </span>{" "}
+                        <span ref={titleCopy}>Hi, I&apos;m Tiago and I build</span>{" "}
                         <span ref={systemsWord} className="hero-systems-word">
-              digital systems
+              digital solutions
             </span>{" "}
-                        <span className="hero-title-ending">people enjoy using.</span>
+                        <span className="hero-title-ending">users love and businesses value.</span>
                     </h1>
                 </div>
 
                 <div ref={heroFooter} className="hero-footer">
                     <p className="hero-description">
-                        Web applications, booking platforms, support portals and real-time
-                        systems built around actual operational needs.
+                        Web applications, booking platforms, support portals and real-time systems built
+                        around actual operational needs.
                     </p>
 
                     <div className="hero-stage">
@@ -577,73 +417,89 @@ export default function Home() {
                 </div>
             </section>
 
-            <section
-                ref={about}
-                id="about"
-                className="content-section about-section"
-                aria-labelledby="about-title"
-            >
-                <div className="section-header">
-                    <p ref={aboutEyebrow} className="section-kicker">
-                        02 / About me
-                    </p>
-
-                    <div className="section-progress" aria-hidden="true">
-                        <span>02</span>
-                        <span className="section-progress-track">
-              <span ref={aboutProgress} className="section-progress-fill" />
-            </span>
-                        <span>05</span>
-                    </div>
-                </div>
-
-                <div className="about-content">
-                    <h2 ref={aboutTitle} id="about-title">
-                        Code comes second. First, I bridge the gap between human needs and
-                        business goals.
-                    </h2>
-
-                    <p ref={aboutCopy} className="about-copy">
-                        I&apos;m Tiago Oliveira, a full-stack developer based in Portugal.
-                        I combine product thinking, interface design and engineering to
-                        turn complex workflows into practical digital experiences.
-                    </p>
-                </div>
-
-                <div ref={aboutFooter} className="section-footer">
-                    <p className="section-footer-copy">
-                        I care about the detail behind a good product: clear flows,
-                        reliable systems and software that stays useful after launch.
-                    </p>
-
-                    <div className="section-footer-meta">
-                        <span>Based in</span>
-                        <span>Viana do Castelo, PT</span>
+            <div ref={aboutWrap} className="panel-wrap">
+                <section ref={about} id="about" className="panel-sticky about-section" aria-labelledby="about-title">
+                    <div className="section-header">
+                        <p className="section-kicker">02 / About me</p>
+                        <div className="section-progress" aria-hidden="true">
+                            <span>02</span>
+                            <span className="section-progress-track">
+                <span className="section-progress-fill section-progress-static" />
+              </span>
+                            <span>05</span>
+                        </div>
                     </div>
 
-                    <a className="section-footer-link" href="#services">
-                        <span>What I do next</span>
-                        <span aria-hidden="true">↓</span>
-                    </a>
-                </div>
-            </section>
+                    <div className="about-body">
+                        <div className="about-top">
+                            <h2 ref={aboutTitle} id="about-title">
+                                Code comes second. First, I bridge the gap between human needs and
+                                business goals.
+                            </h2>
 
-            <section id="services" className="content-section services-section">
-                <div className="section-header">
-                    <p className="section-kicker">03 / What I do</p>
-                    <div className="section-progress" aria-hidden="true">
-                        <span>03</span>
-                        <span className="section-progress-track">
-              <span className="section-progress-fill section-progress-static" />
-            </span>
-                        <span>05</span>
+                            <p ref={aboutCopy} className="about-copy">
+                                I&apos;m Tiago Oliveira, a full-stack developer based in Portugal. I combine
+                                product thinking, interface design and engineering to turn complex workflows
+                                into practical digital experiences.
+                            </p>
+                        </div>
+
+                        <div ref={aboutActivity} className="about-activity">
+                            <span className="last-activity-label">Last activity</span>
+
+                            <ul className="last-activity-list">
+                                <li>
+                                    <span className="last-activity-meta">Work</span>
+                                    <span>Building booking and support systems with real operational data.</span>
+                                </li>
+                                <li>
+                                    <span className="last-activity-meta">Study</span>
+                                    <span>Informatics and Computer Engineering student at FEUP.</span>
+                                </li>
+                                <li>
+                                    <span className="last-activity-meta">Side</span>
+                                    <span>Experimenting with home automation and transport projects.</span>
+                                </li>
+                            </ul>
+                        </div>
                     </div>
-                </div>
 
-                <div className="about-content">
-                    <h2>Products, systems and interfaces made for real work.</h2>
-                </div>
-            </section>
+                    <div ref={aboutFooter} className="section-footer">
+                        <p className="section-footer-copy">Always building something on the side.</p>
+
+                        <div className="section-footer-meta">
+                            <span>Based in</span>
+                            <span>Viana do Castelo, PT</span>
+                        </div>
+
+                        <a className="section-footer-link" href="#services">
+                            <span>See what I do</span>
+                            <span aria-hidden="true">↓</span>
+                        </a>
+                    </div>
+                </section>
+            </div>
+
+            <div ref={servicesWrap} className="panel-wrap">
+                <section ref={services} id="services" className="panel-sticky services-section">
+                    <div className="section-header">
+                        <p className="section-kicker">03 / What I do</p>
+                        <div className="section-progress" aria-hidden="true">
+                            <span>03</span>
+                            <span className="section-progress-track">
+                <span className="section-progress-fill section-progress-static" />
+              </span>
+                            <span>05</span>
+                        </div>
+                    </div>
+
+                    <div className="about-body">
+                        <div className="about-top">
+                            <h2>Products, systems and interfaces made for real work.</h2>
+                        </div>
+                    </div>
+                </section>
+            </div>
 
             <section id="contact" className="content-section contact-section">
                 <div className="section-header">
@@ -657,8 +513,10 @@ export default function Home() {
                     </div>
                 </div>
 
-                <div className="about-content">
-                    <h2>Have a difficult product problem worth solving?</h2>
+                <div className="about-body">
+                    <div className="about-top">
+                        <h2>Have a difficult product problem worth solving?</h2>
+                    </div>
                 </div>
             </section>
         </main>
